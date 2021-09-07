@@ -218,9 +218,11 @@ enum LispExpressionResult {
 impl LispExpression {
     fn eval(expr: LispExpression) -> Result<LispExpressionResult, CustomError> {
         match expr {
-            LispExpression::Add { .. } => Ok(LispExpressionResult::ArithmeticResult(
-                ArithmeticResult::Number(2),
-            )),
+            LispExpression::Add {
+                result_type,
+                types,
+                args,
+            } => Ok(Self::add(result_type, types, (args.0, args.1))),
             LispExpression::Multiply { .. } => Ok(LispExpressionResult::ArithmeticResult(
                 ArithmeticResult::Number(2),
             )),
@@ -266,31 +268,46 @@ impl LispExpression {
         }
     }
 
-    // fn get_text(expr: LispExpression) -> &str {
-    //     if let LispExpressionResult::ArithmeticResult(ArithmeticResult::Text(x)) = LispExpression::eval(expr) {
-    //         x
-    //     } else {
-    //         ""
-    //     }
-    // }
+    fn get_text(expr: LispExpression) -> Result<String, CustomError> {
+        match Self::eval(expr)? {
+            LispExpressionResult::ArithmeticResult(ArithmeticResult::Text(x)) => Ok(x),
+            LispExpressionResult::ComparatorResult(ComparatorResult::Text(x)) => Ok(x),
+            LispExpressionResult::LogicalResult(LogicalResult::Text(x)) => Ok(x),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Text(x)) => Ok(x),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
 
-    // fn get_number(expr: LispExpression) -> i32 {
-    //     0
-    // }
+    fn get_number(expr: LispExpression) -> Result<i32, CustomError> {
+        match Self::eval(expr)? {
+            LispExpressionResult::ArithmeticResult(ArithmeticResult::Number(x)) => Ok(x),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Number(x)) => Ok(x),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
 
-    // fn get_decimal(expr: LispExpression) -> BigDecimal {
-    //     ""
-    // }
+    fn get_decimal(expr: LispExpression) -> Result<BigDecimal, CustomError> {
+        match Self::eval(expr)? {
+            LispExpressionResult::ArithmeticResult(ArithmeticResult::Decimal(x)) => Ok(x),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Decimal(x)) => Ok(x),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
 
-    // fn get_boolean(expr: LispExpression) -> bool {
-    //     ""
-    // }
+    fn get_boolean(expr: LispExpression) -> Result<bool, CustomError> {
+        match Self::eval(expr)? {
+            LispExpressionResult::ComparatorResult(ComparatorResult::Boolean(x)) => Ok(x),
+            LispExpressionResult::LogicalResult(LogicalResult::Boolean(x)) => Ok(x),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Boolean(x)) => Ok(x),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
 
     fn add(
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
         args: (ArithmeticArg, Vec<ArithmeticArg>),
-    ) -> ArithmeticResult {
+    ) -> LispExpressionResult {
         let last_type = match types.1.is_empty() {
             true => &types.0,
             false => types.1.last().unwrap(),
@@ -332,13 +349,13 @@ impl LispExpression {
                             ArithmeticArg::Decimal(x) => acc + x,
                         },
                     });
-                match result_type {
+                LispExpressionResult::ArithmeticResult(match result_type {
                     ArithmeticResultType::Number => {
                         ArithmeticResult::Number(result.to_i32().unwrap())
                     }
                     ArithmeticResultType::Decimal => ArithmeticResult::Decimal(result),
                     ArithmeticResultType::Text => ArithmeticResult::Text(result.to_string()),
-                }
+                })
             }
             false => {
                 let init: i32 = match types.0 {
@@ -367,25 +384,25 @@ impl LispExpression {
                             },
                         }
                     });
-                match result_type {
+                LispExpressionResult::ArithmeticResult(match result_type {
                     ArithmeticResultType::Number => ArithmeticResult::Number(result),
                     ArithmeticResultType::Decimal => {
                         ArithmeticResult::Decimal(BigDecimal::from_i32(result).unwrap())
                     }
                     ArithmeticResultType::Text => ArithmeticResult::Text(result.to_string()),
-                }
+                })
             }
         }
     }
 }
 
 fn main() {
-    let x: LispExpression = LispExpression::Multiply {
+    let x: LispExpression = LispExpression::Add {
         result_type: ArithmeticResultType::Number,
         types: (ArithmeticArgType::Number, vec![]),
         args: Box::new((
-            ArithmeticArg::Decimal(BigDecimal::from_i32(2).unwrap()),
-            vec![],
+            ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
         )),
     };
     let mut book_reviews = HashMap::new();
@@ -410,9 +427,20 @@ fn main() {
             ArithmeticResultType::Number,
             (ArithmeticArgType::Number, vec![]),
             (
-                ArithmeticArg::Decimal(BigDecimal::from_i32(2).unwrap()),
-                vec![ArithmeticArg::Decimal(BigDecimal::from_i32(2).unwrap())]
+                ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+                vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
             )
         )
-    )
+    );
+
+    let x: LispExpression = LispExpression::Add {
+        result_type: ArithmeticResultType::Number,
+        types: (ArithmeticArgType::Number, vec![]),
+        args: Box::new((
+            ArithmeticArg::Decimal(BigDecimal::from_i32(38).unwrap()),
+            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
+        )),
+    };
+
+    println!("{:?}", LispExpression::get_number(x).unwrap())
 }
