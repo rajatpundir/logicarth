@@ -331,27 +331,25 @@ impl LispExpression<'static> {
                     Some(v) => v,
                     None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                 };
-                let init: Result<BigDecimal, CustomError> = {
-                    match &args.0 {
-                        ArithmeticArg::Number(v) => match BigDecimal::from_i32(*v) {
-                            Some(v1) => {
-                                init_val += v1;
-                                Ok(init_val)
-                            }
-                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                        },
-                        ArithmeticArg::Decimal(v1) => {
+                let init: Result<BigDecimal, CustomError> = match &args.0 {
+                    ArithmeticArg::Number(v) => match BigDecimal::from_i32(*v) {
+                        Some(v1) => {
                             init_val += v1;
                             Ok(init_val)
-                        },
-                        ArithmeticArg::Expression(v1) => match LispExpression::get_decimal(&v1) {
-                            Ok(v2) => {
-                                init_val += v2;
-                                Ok(init_val)
-                            }
-                            Err(e) => Err(e),
-                        },
+                        }
+                        None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    },
+                    ArithmeticArg::Decimal(v1) => {
+                        init_val += v1;
+                        Ok(init_val)
                     }
+                    ArithmeticArg::Expression(v1) => match LispExpression::get_decimal(&v1) {
+                        Ok(v2) => {
+                            init_val += v2;
+                            Ok(init_val)
+                        }
+                        Err(e) => Err(e),
+                    },
                 };
                 let result: Result<BigDecimal, CustomError> = args
                     .1
@@ -496,14 +494,14 @@ impl LispExpression<'static> {
 }
 
 fn main() {
-    // let x: LispExpression = LispExpression::Add {
-    //     result_type: ArithmeticResultType::Number,
-    //     types: (ArithmeticArgType::Number, vec![]),
-    //     args: Box::new((
-    //         ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
-    //         vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())],
-    //     )),
-    // };
+    let y: LispExpression = LispExpression::Add {
+        result_type: ArithmeticResultType::Number,
+        types: (ArithmeticArgType::Number, vec![]),
+        args: Box::new((
+            ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())],
+        )),
+    };
     // let mut book_reviews = HashMap::new();
 
     // // Review some books.
@@ -537,9 +535,41 @@ fn main() {
         types: (ArithmeticArgType::Number, vec![]),
         args: Box::new((
             ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
-            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap())],
+            vec![
+                ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap()),
+                ArithmeticArg::Expression(&y),
+            ],
         )),
     };
 
     println!("{:?}", LispExpression::get_number(&x).unwrap());
+}
+
+#[cfg(test)]
+mod lisp_tests {
+    use super::*;
+
+    #[test]
+    fn add() {
+        let expr1: LispExpression = LispExpression::Add {
+            result_type: ArithmeticResultType::Number,
+            types: (ArithmeticArgType::Number, vec![]),
+            args: Box::new((
+                ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+                vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())],
+            )),
+        };
+        let expr2: LispExpression = LispExpression::Add {
+            result_type: ArithmeticResultType::Number,
+            types: (ArithmeticArgType::Number, vec![]),
+            args: Box::new((
+                ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
+                vec![
+                    ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap()),
+                    ArithmeticArg::Expression(&expr1),
+                ],
+            )),
+        };
+        assert_eq!(LispExpression::get_number(&expr2).unwrap(), 32);
+    }
 }
