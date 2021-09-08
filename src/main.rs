@@ -32,10 +32,10 @@ enum ArithmeticArgType {
 }
 
 #[derive(Debug)]
-enum ArithmeticArg {
+enum ArithmeticArg<'a> {
     Number(i32),
     Decimal(BigDecimal),
-    // Expression(LispExpression),
+    Expression(&'a LispExpression<'a>),
 }
 
 // Comparator Ops
@@ -99,43 +99,43 @@ enum ControlFlowArgType {
 }
 
 #[derive(Debug)]
-enum ControlFlowArg {
-    Boolean(bool, LispExpression, LispExpression),
-    Expression(LispExpression, LispExpression, LispExpression),
+enum ControlFlowArg<'a> {
+    Boolean(bool, LispExpression<'a>, LispExpression<'a>),
+    Expression(LispExpression<'a>, LispExpression<'a>, LispExpression<'a>),
 }
 
 // Note. In some places, tuples or slices could be used here instead of arrays
 #[derive(Debug)]
-enum LispExpression {
+enum LispExpression<'a> {
     Add {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
     },
     Multiply {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
     },
     Subtract {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
     },
     Divide {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
     },
     Power {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
     },
     Modulus {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
     },
     Equals {
         result_type: ComparatorResultType,
@@ -177,7 +177,7 @@ enum LispExpression {
     If {
         result_type: ControlFlowResultType,
         types: (ControlFlowArgType, Vec<ControlFlowArgType>),
-        args: Box<ControlFlowArg>,
+        args: Box<ControlFlowArg<'a>>,
     },
 }
 
@@ -216,14 +216,14 @@ enum LispExpressionResult {
     ControlFlowResult(ControlFlowResult),
 }
 
-impl LispExpression {
-    fn eval(expr: LispExpression) -> Result<LispExpressionResult, CustomError> {
+impl LispExpression<'static> {
+    fn eval(expr: &LispExpression) -> Result<LispExpressionResult, CustomError> {
         match expr {
             LispExpression::Add {
                 result_type,
                 types,
                 args,
-            } => Self::add(result_type, types, (args.0, args.1)),
+            } => Self::add(result_type, types, args),
             LispExpression::Multiply { .. } => Ok(LispExpressionResult::ArithmeticResult(
                 ArithmeticResult::Number(2),
             )),
@@ -269,37 +269,37 @@ impl LispExpression {
         }
     }
 
-    fn get_text(expr: LispExpression) -> Result<String, CustomError> {
+    fn get_text(expr: &LispExpression) -> Result<String, CustomError> {
         match Self::eval(expr)? {
-            LispExpressionResult::ArithmeticResult(ArithmeticResult::Text(x)) => Ok(x),
-            LispExpressionResult::ComparatorResult(ComparatorResult::Text(x)) => Ok(x),
-            LispExpressionResult::LogicalResult(LogicalResult::Text(x)) => Ok(x),
-            LispExpressionResult::ControlFlowResult(ControlFlowResult::Text(x)) => Ok(x),
+            LispExpressionResult::ArithmeticResult(ArithmeticResult::Text(v)) => Ok(v),
+            LispExpressionResult::ComparatorResult(ComparatorResult::Text(v)) => Ok(v),
+            LispExpressionResult::LogicalResult(LogicalResult::Text(v)) => Ok(v),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Text(v)) => Ok(v),
             _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
 
-    fn get_number(expr: LispExpression) -> Result<i32, CustomError> {
+    fn get_number(expr: &LispExpression) -> Result<i32, CustomError> {
         match Self::eval(expr)? {
-            LispExpressionResult::ArithmeticResult(ArithmeticResult::Number(x)) => Ok(x),
-            LispExpressionResult::ControlFlowResult(ControlFlowResult::Number(x)) => Ok(x),
+            LispExpressionResult::ArithmeticResult(ArithmeticResult::Number(v)) => Ok(v),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Number(v)) => Ok(v),
             _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
 
-    fn get_decimal(expr: LispExpression) -> Result<BigDecimal, CustomError> {
+    fn get_decimal(expr: &LispExpression) -> Result<BigDecimal, CustomError> {
         match Self::eval(expr)? {
-            LispExpressionResult::ArithmeticResult(ArithmeticResult::Decimal(x)) => Ok(x),
-            LispExpressionResult::ControlFlowResult(ControlFlowResult::Decimal(x)) => Ok(x),
+            LispExpressionResult::ArithmeticResult(ArithmeticResult::Decimal(v)) => Ok(v),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Decimal(v)) => Ok(v),
             _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
 
-    fn get_boolean(expr: LispExpression) -> Result<bool, CustomError> {
+    fn get_boolean(expr: &LispExpression) -> Result<bool, CustomError> {
         match Self::eval(expr)? {
-            LispExpressionResult::ComparatorResult(ComparatorResult::Boolean(x)) => Ok(x),
-            LispExpressionResult::LogicalResult(LogicalResult::Boolean(x)) => Ok(x),
-            LispExpressionResult::ControlFlowResult(ControlFlowResult::Boolean(x)) => Ok(x),
+            LispExpressionResult::ComparatorResult(ComparatorResult::Boolean(v)) => Ok(v),
+            LispExpressionResult::LogicalResult(LogicalResult::Boolean(v)) => Ok(v),
+            LispExpressionResult::ControlFlowResult(ControlFlowResult::Boolean(v)) => Ok(v),
             _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
@@ -307,9 +307,9 @@ impl LispExpression {
     // Write some docs(to make understanding trivial at first glance) and test cases
     // Integrate expressions
     fn add(
-        result_type: ArithmeticResultType,
-        types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: (ArithmeticArg, Vec<ArithmeticArg>),
+        result_type: &ArithmeticResultType,
+        types: &(ArithmeticArgType, Vec<ArithmeticArgType>),
+        args: &Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     ) -> Result<LispExpressionResult, CustomError> {
         let last_type = match types.1.is_empty() {
             true => &types.0,
@@ -327,32 +327,71 @@ impl LispExpression {
         };
         match contains_decimal_type {
             true => {
-                let init: Result<BigDecimal, CustomError> = match args.0 {
-                    ArithmeticArg::Number(x) => match BigDecimal::from_i32(x) {
-                        Some(v) => Ok(v),
-                        None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    ArithmeticArg::Decimal(x) => Ok(x),
+                let mut init_val: BigDecimal = match BigDecimal::from_i32(0) {
+                    Some(v) => v,
+                    None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                };
+                let init: Result<BigDecimal, CustomError> = {
+                    match &args.0 {
+                        ArithmeticArg::Number(v) => match BigDecimal::from_i32(*v) {
+                            Some(v1) => {
+                                init_val += v1;
+                                Ok(init_val)
+                            }
+                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                        },
+                        ArithmeticArg::Decimal(v1) => {
+                            init_val += v1;
+                            Ok(init_val)
+                        },
+                        ArithmeticArg::Expression(v1) => match LispExpression::get_decimal(&v1) {
+                            Ok(v2) => {
+                                init_val += v2;
+                                Ok(init_val)
+                            }
+                            Err(e) => Err(e),
+                        },
+                    }
                 };
                 let result: Result<BigDecimal, CustomError> = args
                     .1
                     .iter()
                     .zip(types.1.iter().chain(repeat(last_type)))
                     .fold(init, |acc, val| match acc {
-                        Ok(acc_val) => match val.1 {
+                        Ok(v) => match val.1 {
                             ArithmeticArgType::Number => match val.0 {
-                                ArithmeticArg::Number(x) => match BigDecimal::from_i32(*x) {
-                                    Some(v) => Ok(acc_val + v),
-                                    None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                ArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
+                                    Some(v1) => Ok(v + v1),
+                                    None => {
+                                        return Err(CustomError::Message(
+                                            UNEXPECTED_ERROR.to_string(),
+                                        ))
+                                    }
                                 },
-                                ArithmeticArg::Decimal(x) => Ok(acc_val + x),
+                                ArithmeticArg::Decimal(v1) => Ok(v + v1),
+                                ArithmeticArg::Expression(v1) => {
+                                    match LispExpression::get_decimal(v1) {
+                                        Ok(v2) => Ok(v + v2),
+                                        Err(e) => Err(e),
+                                    }
+                                }
                             },
                             ArithmeticArgType::Decimal => match val.0 {
-                                ArithmeticArg::Number(x) => match BigDecimal::from_i32(*x) {
-                                    Some(v) => Ok(acc_val + v),
-                                    None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                ArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
+                                    Some(v1) => Ok(v + v1),
+                                    None => {
+                                        return Err(CustomError::Message(
+                                            UNEXPECTED_ERROR.to_string(),
+                                        ))
+                                    }
                                 },
-                                ArithmeticArg::Decimal(x) => Ok(acc_val + x),
+                                ArithmeticArg::Decimal(v1) => Ok(v + v1),
+                                ArithmeticArg::Expression(v1) => {
+                                    match LispExpression::get_decimal(v1) {
+                                        Ok(v2) => Ok(v + v2),
+                                        Err(e) => Err(e),
+                                    }
+                                }
                             },
                         },
                         Err(_) => acc,
@@ -382,11 +421,15 @@ impl LispExpression {
                 }
             }
             false => {
-                let init: Result<i32, CustomError> = match args.0 {
-                    ArithmeticArg::Number(x) => Ok(x),
-                    ArithmeticArg::Decimal(x) => match x.to_i32() {
-                        Some(v) => Ok(v),
+                let init: Result<i32, CustomError> = match &args.0 {
+                    ArithmeticArg::Number(v) => Ok(*v),
+                    ArithmeticArg::Decimal(v) => match v.to_i32() {
+                        Some(v1) => Ok(v1),
                         None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    },
+                    ArithmeticArg::Expression(v1) => match LispExpression::get_number(v1) {
+                        Ok(v2) => Ok(v2),
+                        Err(e) => Err(e),
                     },
                 };
                 let result: Result<i32, CustomError> = args
@@ -401,6 +444,12 @@ impl LispExpression {
                                     Some(v2) => Ok(v + v2),
                                     None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                                 },
+                                ArithmeticArg::Expression(v1) => {
+                                    match LispExpression::get_number(v1) {
+                                        Ok(v2) => Ok(v + v2),
+                                        Err(e) => Err(e),
+                                    }
+                                }
                             },
                             ArithmeticArgType::Decimal => match val.0 {
                                 ArithmeticArg::Number(v1) => Ok(v + *v1),
@@ -408,6 +457,12 @@ impl LispExpression {
                                     Some(v2) => Ok(v + v2),
                                     None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                                 },
+                                ArithmeticArg::Expression(v1) => {
+                                    match LispExpression::get_number(v1) {
+                                        Ok(v2) => Ok(v + v2),
+                                        Err(e) => Err(e),
+                                    }
+                                }
                             },
                         },
                         Err(_) => acc,
@@ -486,5 +541,5 @@ fn main() {
         )),
     };
 
-    println!("{:?}", LispExpression::get_number(x).unwrap());
+    println!("{:?}", LispExpression::get_number(&x).unwrap());
 }
