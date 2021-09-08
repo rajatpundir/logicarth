@@ -7,7 +7,8 @@
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use std::collections::HashMap;
 use std::iter::repeat;
-use std::str::FromStr;
+
+const UNEXPECTED_ERROR: &str = "Unexpected Error";
 
 #[derive(Debug)]
 enum CustomError {
@@ -222,7 +223,7 @@ impl LispExpression {
                 result_type,
                 types,
                 args,
-            } => Ok(Self::add(result_type, types, (args.0, args.1))),
+            } => Self::add(result_type, types, (args.0, args.1)),
             LispExpression::Multiply { .. } => Ok(LispExpressionResult::ArithmeticResult(
                 ArithmeticResult::Number(2),
             )),
@@ -303,144 +304,187 @@ impl LispExpression {
         }
     }
 
+    // Write some docs(to make understanding trivial at first glance) and test cases
+    // Integrate expressions
     fn add(
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
         args: (ArithmeticArg, Vec<ArithmeticArg>),
-    ) -> LispExpressionResult {
+    ) -> Result<LispExpressionResult, CustomError> {
         let last_type = match types.1.is_empty() {
             true => &types.0,
-            false => types.1.last().unwrap(),
+            false => match types.1.last() {
+                Some(v) => v,
+                None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+            },
         };
-        let contains_decimal_type: bool = if let ArithmeticArgType::Decimal = types.0 {
-            true
-        } else {
-            types.1.iter().fold(false, |acc, val| {
-                acc || if let ArithmeticArgType::Decimal = val {
-                    true
-                } else {
-                    false
-                }
-            })
+        let contains_decimal_type: bool = match types.0 {
+            ArithmeticArgType::Decimal => true,
+            _ => types.1.iter().any(|val| match val {
+                ArithmeticArgType::Decimal => true,
+                _ => false,
+            }),
         };
         match contains_decimal_type {
             true => {
-                let init: BigDecimal = match types.0 {
-                    ArithmeticArgType::Number => match args.0 {
-                        ArithmeticArg::Number(x) => BigDecimal::from_i32(x).unwrap(),
-                        ArithmeticArg::Decimal(x) => x,
+                let init: Result<BigDecimal, CustomError> = match args.0 {
+                    ArithmeticArg::Number(x) => match BigDecimal::from_i32(x) {
+                        Some(v) => Ok(v),
+                        None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                     },
-                    ArithmeticArgType::Decimal => match args.0 {
-                        ArithmeticArg::Number(x) => BigDecimal::from_i32(x).unwrap(),
-                        ArithmeticArg::Decimal(x) => x,
-                    },
+                    ArithmeticArg::Decimal(x) => Ok(x),
                 };
-                let result: BigDecimal = args
+                let result: Result<BigDecimal, CustomError> = args
                     .1
                     .iter()
                     .zip(types.1.iter().chain(repeat(last_type)))
-                    .fold(init, |acc, val| match val.1 {
-                        ArithmeticArgType::Number => match val.0 {
-                            ArithmeticArg::Number(x) => acc + BigDecimal::from_i32(*x).unwrap(),
-                            ArithmeticArg::Decimal(x) => acc + x,
-                        },
-                        ArithmeticArgType::Decimal => match val.0 {
-                            ArithmeticArg::Number(x) => acc + BigDecimal::from_i32(*x).unwrap(),
-                            ArithmeticArg::Decimal(x) => acc + x,
-                        },
-                    });
-                LispExpressionResult::ArithmeticResult(match result_type {
-                    ArithmeticResultType::Number => {
-                        ArithmeticResult::Number(result.to_i32().unwrap())
-                    }
-                    ArithmeticResultType::Decimal => ArithmeticResult::Decimal(result),
-                    ArithmeticResultType::Text => ArithmeticResult::Text(result.to_string()),
-                })
-            }
-            false => {
-                let init: i32 = match types.0 {
-                    ArithmeticArgType::Number => match args.0 {
-                        ArithmeticArg::Number(x) => x,
-                        ArithmeticArg::Decimal(x) => x.to_i32().unwrap(),
-                    },
-                    ArithmeticArgType::Decimal => match args.0 {
-                        ArithmeticArg::Number(x) => x,
-                        ArithmeticArg::Decimal(x) => x.to_i32().unwrap(),
-                    },
-                };
-                let result: i32 = args
-                    .1
-                    .iter()
-                    .zip(types.1.iter().chain(repeat(last_type)))
-                    .fold(init, |acc, val| {
-                        acc + match val.1 {
+                    .fold(init, |acc, val| match acc {
+                        Ok(acc_val) => match val.1 {
                             ArithmeticArgType::Number => match val.0 {
-                                ArithmeticArg::Number(x) => *x,
-                                ArithmeticArg::Decimal(x) => x.to_i32().unwrap(),
+                                ArithmeticArg::Number(x) => match BigDecimal::from_i32(*x) {
+                                    Some(v) => Ok(acc_val + v),
+                                    None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                },
+                                ArithmeticArg::Decimal(x) => Ok(acc_val + x),
                             },
                             ArithmeticArgType::Decimal => match val.0 {
-                                ArithmeticArg::Number(x) => *x,
-                                ArithmeticArg::Decimal(x) => x.to_i32().unwrap(),
+                                ArithmeticArg::Number(x) => match BigDecimal::from_i32(*x) {
+                                    Some(v) => Ok(acc_val + v),
+                                    None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                },
+                                ArithmeticArg::Decimal(x) => Ok(acc_val + x),
                             },
-                        }
+                        },
+                        Err(_) => acc,
                     });
-                LispExpressionResult::ArithmeticResult(match result_type {
-                    ArithmeticResultType::Number => ArithmeticResult::Number(result),
-                    ArithmeticResultType::Decimal => {
-                        ArithmeticResult::Decimal(BigDecimal::from_i32(result).unwrap())
-                    }
-                    ArithmeticResultType::Text => ArithmeticResult::Text(result.to_string()),
-                })
+                match result_type {
+                    ArithmeticResultType::Number => match result {
+                        Ok(v) => match v.to_i32() {
+                            Some(v1) => Ok(LispExpressionResult::ArithmeticResult(
+                                ArithmeticResult::Number(v1),
+                            )),
+                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                        },
+                        Err(e) => Err(e),
+                    },
+                    ArithmeticResultType::Decimal => match result {
+                        Ok(v) => Ok(LispExpressionResult::ArithmeticResult(
+                            ArithmeticResult::Decimal(v),
+                        )),
+                        Err(e) => Err(e),
+                    },
+                    ArithmeticResultType::Text => match result {
+                        Ok(v) => Ok(LispExpressionResult::ArithmeticResult(
+                            ArithmeticResult::Text(v.to_string()),
+                        )),
+                        Err(e) => Err(e),
+                    },
+                }
+            }
+            false => {
+                let init: Result<i32, CustomError> = match args.0 {
+                    ArithmeticArg::Number(x) => Ok(x),
+                    ArithmeticArg::Decimal(x) => match x.to_i32() {
+                        Some(v) => Ok(v),
+                        None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    },
+                };
+                let result: Result<i32, CustomError> = args
+                    .1
+                    .iter()
+                    .zip(types.1.iter().chain(repeat(last_type)))
+                    .fold(init, |acc, val| match acc {
+                        Ok(v) => match val.1 {
+                            ArithmeticArgType::Number => match val.0 {
+                                ArithmeticArg::Number(v1) => Ok(v + *v1),
+                                ArithmeticArg::Decimal(v1) => match v1.to_i32() {
+                                    Some(v2) => Ok(v + v2),
+                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                },
+                            },
+                            ArithmeticArgType::Decimal => match val.0 {
+                                ArithmeticArg::Number(v1) => Ok(v + *v1),
+                                ArithmeticArg::Decimal(v1) => match v1.to_i32() {
+                                    Some(v2) => Ok(v + v2),
+                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                },
+                            },
+                        },
+                        Err(_) => acc,
+                    });
+                match result_type {
+                    ArithmeticResultType::Number => match result {
+                        Ok(v) => Ok(LispExpressionResult::ArithmeticResult(
+                            ArithmeticResult::Number(v),
+                        )),
+                        Err(e) => Err(e),
+                    },
+                    ArithmeticResultType::Decimal => match result {
+                        Ok(v) => match BigDecimal::from_i32(v) {
+                            Some(v1) => Ok(LispExpressionResult::ArithmeticResult(
+                                ArithmeticResult::Decimal(v1),
+                            )),
+                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                        },
+                        Err(e) => Err(e),
+                    },
+                    ArithmeticResultType::Text => match result {
+                        Ok(v) => Ok(LispExpressionResult::ArithmeticResult(
+                            ArithmeticResult::Text(v.to_string()),
+                        )),
+                        Err(e) => Err(e),
+                    },
+                }
             }
         }
     }
 }
 
 fn main() {
+    // let x: LispExpression = LispExpression::Add {
+    //     result_type: ArithmeticResultType::Number,
+    //     types: (ArithmeticArgType::Number, vec![]),
+    //     args: Box::new((
+    //         ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+    //         vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())],
+    //     )),
+    // };
+    // let mut book_reviews = HashMap::new();
+
+    // // Review some books.
+    // book_reviews.insert(
+    //     "Adventures of Huckleberry Finn".to_string(),
+    //     "My favorite book.".to_string(),
+    // );
+    // println!("{:?}", x);
+    // println!("{:?}", LispExpression::eval(x).unwrap());
+    // println!("{:?}", book_reviews);
+    // let input = "0.8";
+    // let dec = BigDecimal::from_str(&input).unwrap();
+    // let float = f32::from_str(&input).unwrap();
+
+    // println!("Input ({}) with 10 decimals: {} vs {})", input, dec, float);
+
+    // println!(
+    //     "{:?}",
+    //     LispExpression::add(
+    //         ArithmeticResultType::Number,
+    //         (ArithmeticArgType::Number, vec![]),
+    //         (
+    //             ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+    //             vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
+    //         )
+    //     )
+    // );
+
     let x: LispExpression = LispExpression::Add {
         result_type: ArithmeticResultType::Number,
         types: (ArithmeticArgType::Number, vec![]),
         args: Box::new((
-            ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
-            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
-        )),
-    };
-    let mut book_reviews = HashMap::new();
-
-    // Review some books.
-    book_reviews.insert(
-        "Adventures of Huckleberry Finn".to_string(),
-        "My favorite book.".to_string(),
-    );
-    println!("{:?}", x);
-    println!("{:?}", LispExpression::eval(x).unwrap());
-    println!("{:?}", book_reviews);
-    let input = "0.8";
-    let dec = BigDecimal::from_str(&input).unwrap();
-    let float = f32::from_str(&input).unwrap();
-
-    println!("Input ({}) with 10 decimals: {} vs {})", input, dec, float);
-
-    println!(
-        "{:?}",
-        LispExpression::add(
-            ArithmeticResultType::Number,
-            (ArithmeticArgType::Number, vec![]),
-            (
-                ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
-                vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
-            )
-        )
-    );
-
-    let x: LispExpression = LispExpression::Add {
-        result_type: ArithmeticResultType::Number,
-        types: (ArithmeticArgType::Number, vec![]),
-        args: Box::new((
-            ArithmeticArg::Decimal(BigDecimal::from_i32(38).unwrap()),
-            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
+            ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
+            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap())],
         )),
     };
 
-    println!("{:?}", LispExpression::get_number(x).unwrap())
+    println!("{:?}", LispExpression::get_number(x).unwrap());
 }
