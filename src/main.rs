@@ -32,10 +32,10 @@ enum ArithmeticArgType {
 }
 
 #[derive(Debug)]
-enum ArithmeticArg<'a> {
+enum ArithmeticArg {
     Number(i32),
     Decimal(BigDecimal),
-    Expression(&'a LispExpression<'a>),
+    Expression(LispExpression),
 }
 
 // Comparator Ops
@@ -99,43 +99,43 @@ enum ControlFlowArgType {
 }
 
 #[derive(Debug)]
-enum ControlFlowArg<'a> {
-    Boolean(bool, LispExpression<'a>, LispExpression<'a>),
-    Expression(LispExpression<'a>, LispExpression<'a>, LispExpression<'a>),
+enum ControlFlowArg {
+    Boolean(bool, LispExpression, LispExpression),
+    Expression(LispExpression, LispExpression, LispExpression),
 }
 
 // Note. In some places, tuples or slices could be used here instead of arrays
 #[derive(Debug)]
-enum LispExpression<'a> {
+enum LispExpression {
     Add {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
+        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
     Multiply {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
+        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
     Subtract {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
+        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
     Divide {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
+        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
     Power {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
+        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
     Modulus {
         result_type: ArithmeticResultType,
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: Box<(ArithmeticArg<'a>, Vec<ArithmeticArg<'a>>)>,
+        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
     Equals {
         result_type: ComparatorResultType,
@@ -177,7 +177,7 @@ enum LispExpression<'a> {
     If {
         result_type: ControlFlowResultType,
         types: (ControlFlowArgType, Vec<ControlFlowArgType>),
-        args: Box<ControlFlowArg<'a>>,
+        args: Box<ControlFlowArg>,
     },
 }
 
@@ -216,7 +216,7 @@ enum LispExpressionResult {
     ControlFlowResult(ControlFlowResult),
 }
 
-impl LispExpression<'static> {
+impl LispExpression {
     fn eval(expr: &LispExpression) -> Result<LispExpressionResult, CustomError> {
         match expr {
             LispExpression::Add {
@@ -494,14 +494,6 @@ impl LispExpression<'static> {
 }
 
 fn main() {
-    let y: LispExpression = LispExpression::Add {
-        result_type: ArithmeticResultType::Number,
-        types: (ArithmeticArgType::Number, vec![]),
-        args: Box::new((
-            ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
-            vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())],
-        )),
-    };
     // let mut book_reviews = HashMap::new();
 
     // // Review some books.
@@ -509,40 +501,28 @@ fn main() {
     //     "Adventures of Huckleberry Finn".to_string(),
     //     "My favorite book.".to_string(),
     // );
-    // println!("{:?}", x);
-    // println!("{:?}", LispExpression::eval(x).unwrap());
-    // println!("{:?}", book_reviews);
-    // let input = "0.8";
-    // let dec = BigDecimal::from_str(&input).unwrap();
-    // let float = f32::from_str(&input).unwrap();
 
-    // println!("Input ({}) with 10 decimals: {} vs {})", input, dec, float);
+    let expr1: LispExpression = LispExpression::Add {
+            result_type: ArithmeticResultType::Number,
+            types: (ArithmeticArgType::Number, vec![]),
+            args: Box::new((
+                ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
+                vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())],
+            )),
+        };
+        let expr2: LispExpression = LispExpression::Add {
+            result_type: ArithmeticResultType::Number,
+            types: (ArithmeticArgType::Number, vec![]),
+            args: Box::new((
+                ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
+                vec![
+                    ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap()),
+                    ArithmeticArg::Expression(expr1),
+                ],
+            )),
+        };
 
-    // println!(
-    //     "{:?}",
-    //     LispExpression::add(
-    //         ArithmeticResultType::Number,
-    //         (ArithmeticArgType::Number, vec![]),
-    //         (
-    //             ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
-    //             vec![ArithmeticArg::Decimal(BigDecimal::from_i32(4).unwrap())]
-    //         )
-    //     )
-    // );
-
-    let x: LispExpression = LispExpression::Add {
-        result_type: ArithmeticResultType::Number,
-        types: (ArithmeticArgType::Number, vec![]),
-        args: Box::new((
-            ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
-            vec![
-                ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap()),
-                ArithmeticArg::Expression(&y),
-            ],
-        )),
-    };
-
-    println!("{:?}", LispExpression::get_number(&x).unwrap());
+    println!("{:?}", LispExpression::get_number(&expr2).unwrap());
 }
 
 #[cfg(test)]
@@ -566,7 +546,7 @@ mod lisp_tests {
                 ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
                 vec![
                     ArithmeticArg::Decimal(BigDecimal::from_i32(13).unwrap()),
-                    ArithmeticArg::Expression(&expr1),
+                    ArithmeticArg::Expression(expr1),
                 ],
             )),
         };
