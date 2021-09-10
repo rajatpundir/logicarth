@@ -194,6 +194,8 @@ enum LispExpression {
     },
 }
 
+// Should probably use references here, &BigDecimal and &str
+// And deal with problems as they come
 #[derive(Debug)]
 enum ArithmeticResult {
     Number(i32),
@@ -623,7 +625,6 @@ impl LispExpression {
                 let init: Result<bool, CustomError> = match &args.0 {
                     ComparatorArg::Number(v) => match &args.1 {
                         ComparatorArg::Number(v1) => match operator {
-                            // TODO. this maybe logical error, maybe addresses are being compared
                             ComparatorOperator::Equals => Ok(v == v1),
                             ComparatorOperator::GreaterThan => Ok(v < v1),
                             ComparatorOperator::LessThan => Ok(v > v1),
@@ -698,80 +699,63 @@ impl LispExpression {
                     let result: Result<bool, CustomError> = evaluated_args
                         .iter()
                         .zip(&evaluated_args[1..])
-                        .fold(init, |acc, val| {
-                            match acc {
-                                Ok(v) => match v {
-                                    true => match val {
-                                        (Ok(v1), Ok(v2)) => match v1 {
+                        .fold(init, |acc, val| match acc {
+                            Ok(v) => match v {
+                                true => match val {
+                                    (Ok(v1), Ok(v2)) => match v1 {
+                                        LispExpressionResult::ArithmeticResult(
+                                            ArithmeticResult::Number(v3),
+                                        ) => match v2 {
                                             LispExpressionResult::ArithmeticResult(
-                                                ArithmeticResult::Number(v3),
-                                            ) => match v2 {
-                                                LispExpressionResult::ArithmeticResult(
-                                                    ArithmeticResult::Number(v4),
-                                                ) => match operator {
-                                                    // TODO. this maybe logical error, maybe addresses are being compared
-                                                    ComparatorOperator::Equals => Ok(v3 == v4),
-                                                    ComparatorOperator::GreaterThan => Ok(v3 < v4),
-                                                    ComparatorOperator::LessThan => Ok(v3 > v4),
-                                                    ComparatorOperator::GreaterThanEquals => {
-                                                        Ok(v3 <= v4)
-                                                    }
-                                                    ComparatorOperator::LessThanEquals => {
-                                                        Ok(v3 >= v4)
-                                                    }
-                                                },
-                                                LispExpressionResult::ControlFlowResult(
-                                                    ControlFlowResult::Number(v4),
-                                                ) => match operator {
-                                                    // TODO. this maybe logical error, maybe addresses are being compared
-                                                    ComparatorOperator::Equals => Ok(v3 == v4),
-                                                    ComparatorOperator::GreaterThan => Ok(v3 < v4),
-                                                    ComparatorOperator::LessThan => Ok(v3 > v4),
-                                                    ComparatorOperator::GreaterThanEquals => {
-                                                        Ok(v3 <= v4)
-                                                    }
-                                                    ComparatorOperator::LessThanEquals => {
-                                                        Ok(v3 >= v4)
-                                                    }
-                                                },
-                                                _ => Err(CustomError::Message(
-                                                    UNEXPECTED_ERROR.to_string(),
-                                                )),
+                                                ArithmeticResult::Number(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
                                             },
                                             LispExpressionResult::ControlFlowResult(
-                                                ControlFlowResult::Number(v3),
-                                            ) => match v2 {
-                                                LispExpressionResult::ArithmeticResult(
-                                                    ArithmeticResult::Number(v4),
-                                                ) => match operator {
-                                                    // TODO. this maybe logical error, maybe addresses are being compared
-                                                    ComparatorOperator::Equals => Ok(v3 == v4),
-                                                    ComparatorOperator::GreaterThan => Ok(v3 < v4),
-                                                    ComparatorOperator::LessThan => Ok(v3 > v4),
-                                                    ComparatorOperator::GreaterThanEquals => {
-                                                        Ok(v3 <= v4)
-                                                    }
-                                                    ComparatorOperator::LessThanEquals => {
-                                                        Ok(v3 >= v4)
-                                                    }
-                                                },
-                                                LispExpressionResult::ControlFlowResult(
-                                                    ControlFlowResult::Number(v4),
-                                                ) => match operator {
-                                                    // TODO. this maybe logical error, maybe addresses are being compared
-                                                    ComparatorOperator::Equals => Ok(v3 == v4),
-                                                    ComparatorOperator::GreaterThan => Ok(v3 < v4),
-                                                    ComparatorOperator::LessThan => Ok(v3 > v4),
-                                                    ComparatorOperator::GreaterThanEquals => {
-                                                        Ok(v3 <= v4)
-                                                    }
-                                                    ComparatorOperator::LessThanEquals => {
-                                                        Ok(v3 >= v4)
-                                                    }
-                                                },
-                                                _ => Err(CustomError::Message(
-                                                    UNEXPECTED_ERROR.to_string(),
-                                                )),
+                                                ControlFlowResult::Number(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
+                                            },
+                                            _ => Err(CustomError::Message(
+                                                UNEXPECTED_ERROR.to_string(),
+                                            )),
+                                        },
+                                        LispExpressionResult::ControlFlowResult(
+                                            ControlFlowResult::Number(v3),
+                                        ) => match v2 {
+                                            LispExpressionResult::ArithmeticResult(
+                                                ArithmeticResult::Number(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
+                                            },
+                                            LispExpressionResult::ControlFlowResult(
+                                                ControlFlowResult::Number(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
                                             },
                                             _ => Err(CustomError::Message(
                                                 UNEXPECTED_ERROR.to_string(),
@@ -781,10 +765,11 @@ impl LispExpression {
                                             Err(CustomError::Message(UNEXPECTED_ERROR.to_string()))
                                         }
                                     },
-                                    false => Ok(false),
+                                    _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                                 },
-                                Err(e) => Err(e),
-                            }
+                                false => Ok(false),
+                            },
+                            Err(e) => Err(e),
                         });
                     match result {
                         Ok(v) => match result_type {
@@ -795,7 +780,165 @@ impl LispExpression {
                     }
                 }
             }
-            ComparatorArgType::Decimal => Ok(ComparatorResult::Boolean(true)),
+            ComparatorArgType::Decimal => {
+                let init: Result<bool, CustomError> = match &args.0 {
+                    ComparatorArg::Decimal(v) => match &args.1 {
+                        ComparatorArg::Decimal(v1) => match operator {
+                            ComparatorOperator::Equals => Ok(v == v1),
+                            ComparatorOperator::GreaterThan => Ok(v < v1),
+                            ComparatorOperator::LessThan => Ok(v > v1),
+                            ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                            ComparatorOperator::LessThanEquals => Ok(v >= v1),
+                        },
+                        ComparatorArg::Expression(v1) => match LispExpression::get_decimal(v1) {
+                            Ok(v2) => match operator {
+                                ComparatorOperator::Equals => Ok(*v == v2),
+                                ComparatorOperator::GreaterThan => Ok(*v < v2),
+                                ComparatorOperator::LessThan => Ok(*v > v2),
+                                ComparatorOperator::GreaterThanEquals => Ok(*v <= v2),
+                                ComparatorOperator::LessThanEquals => Ok(*v >= v2),
+                            },
+                            Err(e) => Err(e),
+                        },
+                        _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    },
+                    ComparatorArg::Expression(v) => match LispExpression::get_decimal(v) {
+                        Ok(v1) => match &args.1 {
+                            ComparatorArg::Decimal(v2) => match operator {
+                                ComparatorOperator::Equals => Ok(v1 == *v2),
+                                ComparatorOperator::GreaterThan => Ok(v1 < *v2),
+                                ComparatorOperator::LessThan => Ok(v1 > *v2),
+                                ComparatorOperator::GreaterThanEquals => Ok(v1 <= *v2),
+                                ComparatorOperator::LessThanEquals => Ok(v1 >= *v2),
+                            },
+                            ComparatorArg::Expression(v2) => match LispExpression::get_decimal(v2) {
+                                Ok(v3) => match operator {
+                                    ComparatorOperator::Equals => Ok(v1 == v3),
+                                    ComparatorOperator::GreaterThan => Ok(v1 < v3),
+                                    ComparatorOperator::LessThan => Ok(v1 > v3),
+                                    ComparatorOperator::GreaterThanEquals => Ok(v1 <= v3),
+                                    ComparatorOperator::LessThanEquals => Ok(v1 >= v3),
+                                },
+                                Err(e) => Err(e),
+                            },
+                            _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                        },
+                        Err(e) => Err(e),
+                    },
+                    _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                };
+                if args.2.len() == 0 {
+                    match init {
+                        Ok(v) => match result_type {
+                            ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                            ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                        },
+                        Err(e) => Err(e),
+                    }
+                } else {
+                    let evaluated_args: Vec<Result<LispExpressionResult, CustomError>> =
+                        std::iter::once(&args.1)
+                            .chain(&args.2)
+                            .map(|val| match val {
+                                ComparatorArg::Decimal(v) => {
+                                    Ok(LispExpressionResult::ArithmeticResult(
+                                        ArithmeticResult::Decimal(v),
+                                    ))
+                                }
+                                ComparatorArg::Expression(v) => match LispExpression::get_decimal(v)
+                                {
+                                    Ok(v1) => Ok(LispExpressionResult::ArithmeticResult(
+                                        ArithmeticResult::Decimal(v1),
+                                    )),
+                                    Err(e) => Err(e),
+                                },
+                                _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                            })
+                            .collect();
+                    let result: Result<bool, CustomError> = evaluated_args
+                        .iter()
+                        .zip(&evaluated_args[1..])
+                        .fold(init, |acc, val| match acc {
+                            Ok(v) => match v {
+                                true => match val {
+                                    (Ok(v1), Ok(v2)) => match v1 {
+                                        LispExpressionResult::ArithmeticResult(
+                                            ArithmeticResult::Decimal(v3),
+                                        ) => match v2 {
+                                            LispExpressionResult::ArithmeticResult(
+                                                ArithmeticResult::Decimal(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
+                                            },
+                                            LispExpressionResult::ControlFlowResult(
+                                                ControlFlowResult::Decimal(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
+                                            },
+                                            _ => Err(CustomError::Message(
+                                                UNEXPECTED_ERROR.to_string(),
+                                            )),
+                                        },
+                                        LispExpressionResult::ControlFlowResult(
+                                            ControlFlowResult::Decimal(v3),
+                                        ) => match v2 {
+                                            LispExpressionResult::ArithmeticResult(
+                                                ArithmeticResult::Decimal(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
+                                            },
+                                            LispExpressionResult::ControlFlowResult(
+                                                ControlFlowResult::Decimal(v4),
+                                            ) => match operator {
+                                                ComparatorOperator::Equals => Ok(v3 == v4),
+                                                ComparatorOperator::GreaterThan => Ok(v3 < v4),
+                                                ComparatorOperator::LessThan => Ok(v3 > v4),
+                                                ComparatorOperator::GreaterThanEquals => {
+                                                    Ok(v3 <= v4)
+                                                }
+                                                ComparatorOperator::LessThanEquals => Ok(v3 >= v4),
+                                            },
+                                            _ => Err(CustomError::Message(
+                                                UNEXPECTED_ERROR.to_string(),
+                                            )),
+                                        },
+                                        _ => {
+                                            Err(CustomError::Message(UNEXPECTED_ERROR.to_string()))
+                                        }
+                                    },
+                                    _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                                },
+                                false => Ok(false),
+                            },
+                            Err(e) => Err(e),
+                        });
+                    match result {
+                        Ok(v) => match result_type {
+                            ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                            ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                        },
+                        Err(e) => Err(e),
+                    }
+                }
+            }
             ComparatorArgType::Text => Ok(ComparatorResult::Boolean(true)),
         }
     }
@@ -834,7 +977,11 @@ fn main() {
     let expr3: LispExpression = LispExpression::GreaterThanEquals {
         result_type: ComparatorResultType::Boolean,
         types: ComparatorArgType::Number,
-        args: Box::new((ComparatorArg::Number(12), ComparatorArg::Number(22), vec![ComparatorArg::Number(22)]))
+        args: Box::new((
+            ComparatorArg::Number(12),
+            ComparatorArg::Number(22),
+            vec![ComparatorArg::Number(22)],
+        )),
     };
     println!("{:?}", LispExpression::get_boolean(&expr3).unwrap());
 }
