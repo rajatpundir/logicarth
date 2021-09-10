@@ -152,27 +152,27 @@ enum LispExpression {
     },
     Equals {
         result_type: ComparatorResultType,
-        types: (ComparatorArgType, Vec<ComparatorArgType>),
+        types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
     },
     GreaterThan {
         result_type: ComparatorResultType,
-        types: (ComparatorArgType, Vec<ComparatorArgType>),
+        types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
     },
     LessThan {
         result_type: ComparatorResultType,
-        types: (ComparatorArgType, Vec<ComparatorArgType>),
+        types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
     },
     GreaterThanEquals {
         result_type: ComparatorResultType,
-        types: (ComparatorArgType, Vec<ComparatorArgType>),
+        types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
     },
     LessThanEquals {
         result_type: ComparatorResultType,
-        types: (ComparatorArgType, Vec<ComparatorArgType>),
+        types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
     },
     And {
@@ -236,42 +236,89 @@ impl LispExpression {
                 result_type,
                 types,
                 args,
-            } => Self::calculate(result_type, types, args, ArithmeticOperator::Add),
+            } => match Self::calculate(result_type, types, args, ArithmeticOperator::Add) {
+                Ok(v) => Ok(LispExpressionResult::ArithmeticResult(v)),
+                Err(e) => Err(e),
+            },
             LispExpression::Multiply {
                 result_type,
                 types,
                 args,
-            } => Self::calculate(result_type, types, args, ArithmeticOperator::Multiply),
+            } => match Self::calculate(result_type, types, args, ArithmeticOperator::Multiply) {
+                Ok(v) => Ok(LispExpressionResult::ArithmeticResult(v)),
+                Err(e) => Err(e),
+            },
             LispExpression::Subtract {
                 result_type,
                 types,
                 args,
-            } => Self::calculate(result_type, types, args, ArithmeticOperator::Subtract),
+            } => match Self::calculate(result_type, types, args, ArithmeticOperator::Subtract) {
+                Ok(v) => Ok(LispExpressionResult::ArithmeticResult(v)),
+                Err(e) => Err(e),
+            },
             LispExpression::Divide {
                 result_type,
                 types,
                 args,
-            } => Self::calculate(result_type, types, args, ArithmeticOperator::Divide),
+            } => match Self::calculate(result_type, types, args, ArithmeticOperator::Divide) {
+                Ok(v) => Ok(LispExpressionResult::ArithmeticResult(v)),
+                Err(e) => Err(e),
+            },
             LispExpression::Modulus {
                 result_type,
                 types,
                 args,
-            } => Self::calculate(result_type, types, args, ArithmeticOperator::Modulus),
-            LispExpression::Equals { .. } => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
-            LispExpression::GreaterThan { .. } => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
-            LispExpression::LessThan { .. } => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
-            LispExpression::GreaterThanEquals { .. } => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
-            LispExpression::LessThanEquals { .. } => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
+            } => match Self::calculate(result_type, types, args, ArithmeticOperator::Modulus) {
+                Ok(v) => Ok(LispExpressionResult::ArithmeticResult(v)),
+                Err(e) => Err(e),
+            },
+            LispExpression::Equals {
+                result_type,
+                types,
+                args,
+            } => match Self::compare(result_type, types, args, ComparatorOperator::Equals) {
+                Ok(v) => Ok(LispExpressionResult::ComparatorResult(v)),
+                Err(e) => Err(e),
+            },
+            LispExpression::GreaterThan {
+                result_type,
+                types,
+                args,
+            } => match Self::compare(result_type, types, args, ComparatorOperator::GreaterThan) {
+                Ok(v) => Ok(LispExpressionResult::ComparatorResult(v)),
+                Err(e) => Err(e),
+            },
+            LispExpression::LessThan {
+                result_type,
+                types,
+                args,
+            } => match Self::compare(result_type, types, args, ComparatorOperator::LessThan) {
+                Ok(v) => Ok(LispExpressionResult::ComparatorResult(v)),
+                Err(e) => Err(e),
+            },
+            LispExpression::GreaterThanEquals {
+                result_type,
+                types,
+                args,
+            } => match Self::compare(
+                result_type,
+                types,
+                args,
+                ComparatorOperator::GreaterThanEquals,
+            ) {
+                Ok(v) => Ok(LispExpressionResult::ComparatorResult(v)),
+                Err(e) => Err(e),
+            },
+            LispExpression::LessThanEquals {
+                result_type,
+                types,
+                args,
+            } => {
+                match Self::compare(result_type, types, args, ComparatorOperator::LessThanEquals) {
+                    Ok(v) => Ok(LispExpressionResult::ComparatorResult(v)),
+                    Err(e) => Err(e),
+                }
+            }
             LispExpression::And { .. } => Ok(LispExpressionResult::LogicalResult(
                 LogicalResult::Boolean(true),
             )),
@@ -323,12 +370,13 @@ impl LispExpression {
     }
 
     // Write test cases and build some audio visual documentation
+    // Here, the return type should be ArithmeticResult since it reduces the output subspace
     fn calculate(
         result_type: &ArithmeticResultType,
         types: &(ArithmeticArgType, Vec<ArithmeticArgType>),
         args: &Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
         operator: ArithmeticOperator,
-    ) -> Result<LispExpressionResult, CustomError> {
+    ) -> Result<ArithmeticResult, CustomError> {
         let last_type = match types.1.is_empty() {
             true => &types.0,
             false => match types.1.last() {
@@ -451,23 +499,17 @@ impl LispExpression {
                 match result_type {
                     ArithmeticResultType::Number => match result {
                         Ok(v) => match v.to_i32() {
-                            Some(v1) => Ok(LispExpressionResult::ArithmeticResult(
-                                ArithmeticResult::Number(v1),
-                            )),
+                            Some(v1) => Ok(ArithmeticResult::Number(v1)),
                             None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                         },
                         Err(e) => Err(e),
                     },
                     ArithmeticResultType::Decimal => match result {
-                        Ok(v) => Ok(LispExpressionResult::ArithmeticResult(
-                            ArithmeticResult::Decimal(v),
-                        )),
+                        Ok(v) => Ok(ArithmeticResult::Decimal(v)),
                         Err(e) => Err(e),
                     },
                     ArithmeticResultType::Text => match result {
-                        Ok(v) => Ok(LispExpressionResult::ArithmeticResult(
-                            ArithmeticResult::Text(v.to_string()),
-                        )),
+                        Ok(v) => Ok(ArithmeticResult::Text(v.to_string())),
                         Err(e) => Err(e),
                     },
                 }
@@ -557,18 +599,12 @@ impl LispExpression {
                     });
                 match result {
                     Ok(v) => match result_type {
-                        ArithmeticResultType::Number => Ok(LispExpressionResult::ArithmeticResult(
-                            ArithmeticResult::Number(v),
-                        )),
+                        ArithmeticResultType::Number => Ok(ArithmeticResult::Number(v)),
                         ArithmeticResultType::Decimal => match BigDecimal::from_i32(v) {
-                            Some(v1) => Ok(LispExpressionResult::ArithmeticResult(
-                                ArithmeticResult::Decimal(v1),
-                            )),
+                            Some(v1) => Ok(ArithmeticResult::Decimal(v1)),
                             None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                         },
-                        ArithmeticResultType::Text => Ok(LispExpressionResult::ArithmeticResult(
-                            ArithmeticResult::Text(v.to_string()),
-                        )),
+                        ArithmeticResultType::Text => Ok(ArithmeticResult::Text(v.to_string())),
                     },
                     Err(e) => Err(e),
                 }
@@ -581,7 +617,7 @@ impl LispExpression {
         types: &ComparatorArgType,
         args: &Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
         operator: ComparatorOperator,
-    ) -> Result<LispExpressionResult, CustomError> {
+    ) -> Result<ComparatorResult, CustomError> {
         match types {
             ComparatorArgType::Number => {
                 let init: Result<bool, CustomError> = match &args.0 {
@@ -634,16 +670,8 @@ impl LispExpression {
                 if args.2.len() == 0 {
                     match init {
                         Ok(v) => match result_type {
-                            ComparatorResultType::Boolean => {
-                                Ok(LispExpressionResult::ComparatorResult(
-                                    ComparatorResult::Boolean(v),
-                                ))
-                            }
-                            ComparatorResultType::Text => {
-                                Ok(LispExpressionResult::ComparatorResult(
-                                    ComparatorResult::Text(v.to_string()),
-                                ))
-                            }
+                            ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                            ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
                         },
                         Err(e) => Err(e),
                     }
@@ -760,27 +788,15 @@ impl LispExpression {
                         });
                     match result {
                         Ok(v) => match result_type {
-                            ComparatorResultType::Boolean => {
-                                Ok(LispExpressionResult::ComparatorResult(
-                                    ComparatorResult::Boolean(v),
-                                ))
-                            }
-                            ComparatorResultType::Text => {
-                                Ok(LispExpressionResult::ComparatorResult(
-                                    ComparatorResult::Text(v.to_string()),
-                                ))
-                            }
+                            ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                            ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
                         },
                         Err(e) => Err(e),
                     }
                 }
             }
-            ComparatorArgType::Decimal => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
-            ComparatorArgType::Text => Ok(LispExpressionResult::ComparatorResult(
-                ComparatorResult::Boolean(true),
-            )),
+            ComparatorArgType::Decimal => Ok(ComparatorResult::Boolean(true)),
+            ComparatorArgType::Text => Ok(ComparatorResult::Boolean(true)),
         }
     }
 }
@@ -814,6 +830,13 @@ fn main() {
         )),
     };
     println!("{:?}", LispExpression::get_number(&expr2).unwrap());
+
+    let expr3: LispExpression = LispExpression::GreaterThanEquals {
+        result_type: ComparatorResultType::Boolean,
+        types: ComparatorArgType::Number,
+        args: Box::new((ComparatorArg::Number(12), ComparatorArg::Number(22), vec![ComparatorArg::Number(22)]))
+    };
+    println!("{:?}", LispExpression::get_boolean(&expr3).unwrap());
 }
 
 #[cfg(test)]
