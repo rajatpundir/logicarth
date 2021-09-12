@@ -442,74 +442,74 @@ impl LispExpression {
                     .1
                     .iter()
                     .zip(types.1.iter().chain(repeat(last_type)))
-                    .fold(init, |acc, val| match acc {
+                    .fold(init, |acc, val| match &acc {
                         Ok(v) => match val.1 {
                             ArithmeticArgType::Number => match val.0 {
                                 ArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
-                                    Some(v1) => Ok(match operator {
-                                        ArithmeticOperator::Add => v + v1,
-                                        ArithmeticOperator::Multiply => v * v1,
-                                        ArithmeticOperator::Subtract => v - v1,
-                                        ArithmeticOperator::Divide => v / v1,
-                                        ArithmeticOperator::Modulus => v % v1,
-                                    }),
+                                    Some(v1) => match operator {
+                                        ArithmeticOperator::Add => Ok(v + v1),
+                                        ArithmeticOperator::Multiply => Ok(v * v1),
+                                        ArithmeticOperator::Subtract => Ok(v - v1),
+                                        ArithmeticOperator::Divide => Ok(v / v1),
+                                        ArithmeticOperator::Modulus => Ok(v % v1),
+                                    },
                                     None => {
                                         return Err(CustomError::Message(
                                             UNEXPECTED_ERROR.to_string(),
                                         ))
                                     }
                                 },
-                                ArithmeticArg::Decimal(v1) => Ok(match operator {
-                                    ArithmeticOperator::Add => v + v1,
-                                    ArithmeticOperator::Multiply => v * v1,
-                                    ArithmeticOperator::Subtract => v - v1,
-                                    ArithmeticOperator::Divide => v / v1,
-                                    ArithmeticOperator::Modulus => v % v1,
-                                }),
+                                ArithmeticArg::Decimal(v1) => match operator {
+                                    ArithmeticOperator::Add => Ok(v + v1),
+                                    ArithmeticOperator::Multiply => Ok(v * v1),
+                                    ArithmeticOperator::Subtract => Ok(v - v1),
+                                    ArithmeticOperator::Divide => Ok(v / v1),
+                                    ArithmeticOperator::Modulus => Ok(v % v1),
+                                },
                                 ArithmeticArg::Expression(v1) => {
                                     match LispExpression::get_decimal(v1) {
-                                        Ok(v2) => Ok(match operator {
-                                            ArithmeticOperator::Add => v + v2,
-                                            ArithmeticOperator::Multiply => v * v2,
-                                            ArithmeticOperator::Subtract => v - v2,
-                                            ArithmeticOperator::Divide => v / v2,
-                                            ArithmeticOperator::Modulus => v % v2,
-                                        }),
+                                        Ok(v2) => match operator {
+                                            ArithmeticOperator::Add => Ok(v + v2),
+                                            ArithmeticOperator::Multiply => Ok(v * v2),
+                                            ArithmeticOperator::Subtract => Ok(v - v2),
+                                            ArithmeticOperator::Divide => Ok(v / v2),
+                                            ArithmeticOperator::Modulus => Ok(v % v2),
+                                        },
                                         Err(e) => Err(e),
                                     }
                                 }
                             },
                             ArithmeticArgType::Decimal => match val.0 {
                                 ArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
-                                    Some(v1) => Ok(match operator {
-                                        ArithmeticOperator::Add => v + v1,
-                                        ArithmeticOperator::Multiply => v * v1,
-                                        ArithmeticOperator::Subtract => v - v1,
-                                        ArithmeticOperator::Divide => v / v1,
-                                        ArithmeticOperator::Modulus => v % v1,
-                                    }),
+                                    Some(v1) => match operator {
+                                        ArithmeticOperator::Add => Ok(v + v1),
+                                        ArithmeticOperator::Multiply => Ok(v * v1),
+                                        ArithmeticOperator::Subtract => Ok(v - v1),
+                                        ArithmeticOperator::Divide => Ok(v / v1),
+                                        ArithmeticOperator::Modulus => Ok(v % v1),
+                                    },
                                     None => {
                                         return Err(CustomError::Message(
                                             UNEXPECTED_ERROR.to_string(),
                                         ))
                                     }
                                 },
-                                ArithmeticArg::Decimal(v1) => Ok(match operator {
-                                    ArithmeticOperator::Add => v + v1,
-                                    ArithmeticOperator::Multiply => v * v1,
-                                    ArithmeticOperator::Subtract => v - v1,
-                                    ArithmeticOperator::Divide => v / v1,
-                                    ArithmeticOperator::Modulus => v % v1,
-                                }),
+                                ArithmeticArg::Decimal(v1) => match operator {
+                                    ArithmeticOperator::Add => Ok(v + v1),
+                                    ArithmeticOperator::Multiply => Ok(v * v1),
+                                    ArithmeticOperator::Subtract => Ok(v - v1),
+                                    ArithmeticOperator::Divide => Ok(v / v1),
+                                    ArithmeticOperator::Modulus => Ok(v % v1),
+                                },
                                 ArithmeticArg::Expression(v1) => {
                                     match LispExpression::get_decimal(v1) {
-                                        Ok(v2) => Ok(match operator {
-                                            ArithmeticOperator::Add => v + v2,
-                                            ArithmeticOperator::Multiply => v * v2,
-                                            ArithmeticOperator::Subtract => v - v2,
-                                            ArithmeticOperator::Divide => v / v2,
-                                            ArithmeticOperator::Modulus => v % v2,
-                                        }),
+                                        Ok(v2) => match operator {
+                                            ArithmeticOperator::Add => Ok(v + v2),
+                                            ArithmeticOperator::Multiply => Ok(v * v2),
+                                            ArithmeticOperator::Subtract => Ok(v - v2),
+                                            ArithmeticOperator::Divide => Ok(v / v2),
+                                            ArithmeticOperator::Modulus => Ok(v % v2),
+                                        },
                                         Err(e) => Err(e),
                                     }
                                 }
@@ -551,66 +551,66 @@ impl LispExpression {
                     .1
                     .iter()
                     .zip(types.1.iter().chain(repeat(last_type)))
-                    .fold(init, |acc, val| match acc {
+                    .fold(init, |acc, val| match &acc {
                         Ok(v) => match val.1 {
                             ArithmeticArgType::Number => match val.0 {
-                                ArithmeticArg::Number(v1) => Ok(match operator {
-                                    ArithmeticOperator::Add => v + *v1,
-                                    ArithmeticOperator::Multiply => v * *v1,
-                                    ArithmeticOperator::Subtract => v - *v1,
-                                    ArithmeticOperator::Divide => v / *v1,
-                                    ArithmeticOperator::Modulus => v % *v1,
-                                }),
+                                ArithmeticArg::Number(v1) => match operator {
+                                    ArithmeticOperator::Add => Ok(v + *v1),
+                                    ArithmeticOperator::Multiply => Ok(v * *v1),
+                                    ArithmeticOperator::Subtract => Ok(v - *v1),
+                                    ArithmeticOperator::Divide => Ok(v / *v1),
+                                    ArithmeticOperator::Modulus => Ok(v % *v1),
+                                },
                                 ArithmeticArg::Decimal(v1) => match v1.to_i32() {
-                                    Some(v2) => Ok(match operator {
-                                        ArithmeticOperator::Add => v + v2,
-                                        ArithmeticOperator::Multiply => v * v2,
-                                        ArithmeticOperator::Subtract => v - v2,
-                                        ArithmeticOperator::Divide => v / v2,
-                                        ArithmeticOperator::Modulus => v % v2,
-                                    }),
+                                    Some(v2) => match operator {
+                                        ArithmeticOperator::Add => Ok(v + v2),
+                                        ArithmeticOperator::Multiply => Ok(v * v2),
+                                        ArithmeticOperator::Subtract => Ok(v - v2),
+                                        ArithmeticOperator::Divide => Ok(v / v2),
+                                        ArithmeticOperator::Modulus => Ok(v % v2),
+                                    },
                                     None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                                 },
                                 ArithmeticArg::Expression(v1) => {
                                     match LispExpression::get_number(v1) {
-                                        Ok(v2) => Ok(match operator {
-                                            ArithmeticOperator::Add => v + v2,
-                                            ArithmeticOperator::Multiply => v * v2,
-                                            ArithmeticOperator::Subtract => v - v2,
-                                            ArithmeticOperator::Divide => v / v2,
-                                            ArithmeticOperator::Modulus => v % v2,
-                                        }),
+                                        Ok(v2) => match operator {
+                                            ArithmeticOperator::Add => Ok(v + v2),
+                                            ArithmeticOperator::Multiply => Ok(v * v2),
+                                            ArithmeticOperator::Subtract => Ok(v - v2),
+                                            ArithmeticOperator::Divide => Ok(v / v2),
+                                            ArithmeticOperator::Modulus => Ok(v % v2),
+                                        },
                                         Err(e) => Err(e),
                                     }
                                 }
                             },
                             ArithmeticArgType::Decimal => match val.0 {
-                                ArithmeticArg::Number(v1) => Ok(match operator {
-                                    ArithmeticOperator::Add => v + *v1,
-                                    ArithmeticOperator::Multiply => v * *v1,
-                                    ArithmeticOperator::Subtract => v - *v1,
-                                    ArithmeticOperator::Divide => v / *v1,
-                                    ArithmeticOperator::Modulus => v % *v1,
-                                }),
+                                ArithmeticArg::Number(v1) => match operator {
+                                    ArithmeticOperator::Add => Ok(v + *v1),
+                                    ArithmeticOperator::Multiply => Ok(v * *v1),
+                                    ArithmeticOperator::Subtract => Ok(v - *v1),
+                                    ArithmeticOperator::Divide => Ok(v / *v1),
+                                    ArithmeticOperator::Modulus => Ok(v % *v1),
+                                },
                                 ArithmeticArg::Decimal(v1) => match v1.to_i32() {
-                                    Some(v2) => Ok(match operator {
-                                        ArithmeticOperator::Add => v + v2,
-                                        ArithmeticOperator::Multiply => v * v2,
-                                        ArithmeticOperator::Subtract => v - v2,
-                                        ArithmeticOperator::Divide => v / v2,
-                                        ArithmeticOperator::Modulus => v % v2,
-                                    }),
+                                    Some(v2) => match operator {
+                                        ArithmeticOperator::Add => Ok(v + v2),
+                                        ArithmeticOperator::Multiply => Ok(v * v2),
+                                        ArithmeticOperator::Subtract => Ok(v - v2),
+                                        ArithmeticOperator::Divide => Ok(v / v2),
+                                        ArithmeticOperator::Modulus => Ok(v % v2),
+                                    },
                                     None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                                 },
                                 ArithmeticArg::Expression(v1) => {
                                     match LispExpression::get_number(v1) {
-                                        Ok(v2) => Ok(match operator {
-                                            ArithmeticOperator::Add => v + v2,
-                                            ArithmeticOperator::Multiply => v * v2,
-                                            ArithmeticOperator::Subtract => v - v2,
-                                            ArithmeticOperator::Divide => v / v2,
-                                            ArithmeticOperator::Modulus => v % v2,
-                                        }),
+                                        Ok(v2) => match operator {
+                                            ArithmeticOperator::Add => Ok(v + v2),
+                                            ArithmeticOperator::Multiply => Ok(v * v2),
+                                            ArithmeticOperator::Subtract => Ok(v - v2),
+                                            ArithmeticOperator::Divide => Ok(v / v2),
+                                            ArithmeticOperator::Modulus => Ok(v % v2),
+                                        },
                                         Err(e) => Err(e),
                                     }
                                 }
@@ -712,7 +712,7 @@ impl LispExpression {
                     let result: Result<bool, CustomError> = evaluated_args
                         .iter()
                         .zip(&evaluated_args[1..])
-                        .fold(init, |acc, val| match acc {
+                        .fold(init, |acc, val| match &acc {
                             Ok(v) => match v {
                                 true => match val {
                                     (
@@ -729,7 +729,7 @@ impl LispExpression {
                                 },
                                 false => Ok(false),
                             },
-                            Err(e) => Err(e),
+                            Err(_) => acc,
                         });
                     match result {
                         Ok(v) => match result_type {
@@ -817,7 +817,7 @@ impl LispExpression {
                     let result: Result<bool, CustomError> = evaluated_args
                         .iter()
                         .zip(&evaluated_args[1..])
-                        .fold(init, |acc, val| match acc {
+                        .fold(init, |acc, val| match &acc {
                             Ok(v) => match v {
                                 true => match val {
                                     (
@@ -834,7 +834,7 @@ impl LispExpression {
                                 },
                                 false => Ok(false),
                             },
-                            Err(e) => Err(e),
+                            Err(_) => acc,
                         });
                     match result {
                         Ok(v) => match result_type {
@@ -918,7 +918,7 @@ impl LispExpression {
                     let result: Result<bool, CustomError> = evaluated_args
                         .iter()
                         .zip(&evaluated_args[1..])
-                        .fold(init, |acc, val| match acc {
+                        .fold(init, |acc, val| match &acc {
                             Ok(v) => match v {
                                 true => match val {
                                     (
@@ -935,7 +935,7 @@ impl LispExpression {
                                 },
                                 false => Ok(false),
                             },
-                            Err(e) => Err(e),
+                            Err(_) => acc,
                         });
                     match result {
                         Ok(v) => match result_type {
