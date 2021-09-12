@@ -206,6 +206,7 @@ enum LispExpression {
         args: Box<LogicalArg>,
     },
     Match {
+        types: (ControlFlowArgType, ControlFlowArgType),
         args: Box<(
             LispExpression,
             Vec<(LispExpression, LispExpression)>,
@@ -341,7 +342,7 @@ impl LispExpression {
                     Err(e) => Err(e),
                 }
             }
-            LispExpression::Match { args } => {
+            LispExpression::Match { types, args } => {
                 match Self::control_flow_op(
                     match result_type {
                         LispExpressionResultType::Number => ControlFlowResultType::Number,
@@ -349,6 +350,7 @@ impl LispExpression {
                         LispExpressionResultType::Boolean => ControlFlowResultType::Boolean,
                         LispExpressionResultType::Text => ControlFlowResultType::Text,
                     },
+                    types,
                     args,
                 ) {
                     Ok(v) => match v {
@@ -1037,42 +1039,18 @@ impl LispExpression {
         }
     }
 
-    fn get_result_type(expr: &LispExpression) -> LispExpressionResultType {
-        match expr {
-            LispExpression::Add { result_type, .. }
-            | LispExpression::Multiply { result_type, .. }
-            | LispExpression::Subtract { result_type, .. }
-            | LispExpression::Divide { result_type, .. }
-            | LispExpression::Modulus { result_type, .. } => match result_type {
-                ArithmeticResultType::Number => LispExpressionResultType::Number,
-                ArithmeticResultType::Decimal => LispExpressionResultType::Decimal,
-                ArithmeticResultType::Text => LispExpressionResultType::Text,
-            },
-            LispExpression::Equals { result_type, .. }
-            | LispExpression::GreaterThan { result_type, .. }
-            | LispExpression::LessThan { result_type, .. }
-            | LispExpression::GreaterThanEquals { result_type, .. }
-            | LispExpression::LessThanEquals { result_type, .. } => match result_type {
-                ComparatorResultType::Boolean => LispExpressionResultType::Boolean,
-                ComparatorResultType::Text => LispExpressionResultType::Text,
-            },
-            LispExpression::And { result_type, .. }
-            | LispExpression::Or { result_type, .. }
-            | LispExpression::Not { result_type, .. } => match result_type {
-                LogicalResultType::Boolean => LispExpressionResultType::Boolean,
-                LogicalResultType::Text => LispExpressionResultType::Text,
-            },
-            LispExpression::Match { result_type, .. } => match result_type {
-                ControlFlowResultType::Number => LispExpressionResultType::Number,
-                ControlFlowResultType::Decimal => LispExpressionResultType::Decimal,
-                ControlFlowResultType::Boolean => LispExpressionResultType::Boolean,
-                ControlFlowResultType::Text => LispExpressionResultType::Text,
-            },
+    fn get_result_type(arg_type: &ControlFlowArgType) -> LispExpressionResultType {
+        match arg_type {
+            ControlFlowArgType::Number => LispExpressionResultType::Number,
+            ControlFlowArgType::Decimal => LispExpressionResultType::Decimal,
+            ControlFlowArgType::Boolean => LispExpressionResultType::Boolean,
+            ControlFlowArgType::Text => LispExpressionResultType::Text,
         }
     }
 
     fn control_flow_op(
         result_type: ControlFlowResultType,
+        types: &(ControlFlowArgType, ControlFlowArgType),
         args: &Box<(
             LispExpression,
             Vec<(LispExpression, LispExpression)>,
@@ -1080,7 +1058,7 @@ impl LispExpression {
         )>,
     ) -> Result<ControlFlowResult, CustomError> {
         match args.1.is_empty() {
-            true => match LispExpression::get_result_type(&args.2) {
+            true => match LispExpression::get_result_type(&types.1) {
                 LispExpressionResultType::Number => match LispExpression::get_number(&args.2) {
                     Ok(v1) => match result_type {
                         ControlFlowResultType::Number => Ok(ControlFlowResult::Number(v1)),
@@ -1121,9 +1099,9 @@ impl LispExpression {
                     Err(e) => Err(e),
                 },
             },
-            false => match LispExpression::get_result_type(&args.0) {
+            false => match LispExpression::get_result_type(&types.0) {
                 LispExpressionResultType::Number => match LispExpression::get_number(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&args.2) {
+                    Ok(v) => match LispExpression::get_result_type(&types.1) {
                         LispExpressionResultType::Number => {
                             let init: Result<(bool, i32), CustomError> = Ok((false, 0));
                             let result: Result<(bool, i32), CustomError> =
@@ -1304,7 +1282,7 @@ impl LispExpression {
                     Err(e) => Err(e),
                 },
                 LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&args.2) {
+                    Ok(v) => match LispExpression::get_result_type(&types.1) {
                         LispExpressionResultType::Number => {
                             let init: Result<(bool, i32), CustomError> = Ok((false, 0));
                             let result: Result<(bool, i32), CustomError> =
@@ -1434,7 +1412,7 @@ impl LispExpression {
                     Err(e) => Err(e),
                 },
                 LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&args.2) {
+                    Ok(v) => match LispExpression::get_result_type(&types.1) {
                         LispExpressionResultType::Number => {
                             let init: Result<(bool, i32), CustomError> = Ok((false, 0));
                             let result: Result<(bool, i32), CustomError> =
@@ -1564,7 +1542,7 @@ impl LispExpression {
                     Err(e) => Err(e),
                 },
                 LispExpressionResultType::Text => match LispExpression::get_text(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&args.2) {
+                    Ok(v) => match LispExpression::get_result_type(&types.1) {
                         LispExpressionResultType::Number => {
                             let init: Result<(bool, i32), CustomError> = Ok((false, 0));
                             let result: Result<(bool, i32), CustomError> =
@@ -1708,7 +1686,6 @@ fn main() {
     //     "My favorite book.".to_string(),
     // );
     let expr1: LispExpression = LispExpression::Add {
-        result_type: ArithmeticResultType::Number,
         types: (ArithmeticArgType::Number, vec![]),
         args: Box::new((
             ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
@@ -1716,7 +1693,6 @@ fn main() {
         )),
     };
     let expr2: LispExpression = LispExpression::Multiply {
-        result_type: ArithmeticResultType::Number,
         types: (ArithmeticArgType::Number, vec![]),
         args: Box::new((
             ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
@@ -1729,7 +1705,6 @@ fn main() {
     println!("{:?}", LispExpression::get_number(&expr2).unwrap());
 
     let expr3: LispExpression = LispExpression::GreaterThanEquals {
-        result_type: ComparatorResultType::Boolean,
         types: ComparatorArgType::Number,
         args: Box::new((
             ComparatorArg::Number(12),
@@ -1738,7 +1713,6 @@ fn main() {
         )),
     };
     let expr4: LispExpression = LispExpression::GreaterThanEquals {
-        result_type: ComparatorResultType::Boolean,
         types: ComparatorArgType::Decimal,
         args: Box::new((
             ComparatorArg::Decimal(BigDecimal::from(2)),
@@ -1757,7 +1731,6 @@ mod lisp_tests {
     #[test]
     fn calculate() {
         let expr1: LispExpression = LispExpression::Add {
-            result_type: ArithmeticResultType::Number,
             types: (ArithmeticArgType::Number, vec![]),
             args: Box::new((
                 ArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
@@ -1765,7 +1738,6 @@ mod lisp_tests {
             )),
         };
         let expr2: LispExpression = LispExpression::Add {
-            result_type: ArithmeticResultType::Number,
             types: (ArithmeticArgType::Number, vec![]),
             args: Box::new((
                 ArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
