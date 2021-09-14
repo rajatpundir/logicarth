@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 const UNEXPECTED_ERROR: &str = "Unexpected Error";
 
+// Making invalid expressions syntactically invalid, probably by wrapping expressions of different result types into their own types
 // 0. Prefer match over if, for consistency
 // 1. Do Internationalization
 // 2. Implement concat, regex, identity
@@ -41,7 +42,8 @@ enum ArithmeticArgType {
 enum ArithmeticArg {
     Number(i32),
     Decimal(BigDecimal),
-    Expression(LispExpression),
+    Expression(ArithmeticExpression),
+    // Expression(ArithmeticControlFlowExpression),
 }
 
 #[derive(Debug)]
@@ -73,7 +75,6 @@ enum ComparatorArg {
     Number(i32),
     Decimal(BigDecimal),
     Text(String),
-    Expression(LispExpression),
 }
 
 #[derive(Debug)]
@@ -101,7 +102,9 @@ enum LogicalArgType {
 #[derive(Debug)]
 enum LogicalArg {
     Boolean(bool),
-    Expression(LispExpression),
+    NumberComparatorExpression(NumberComparatorExpression),
+    DecimalComparatorExpression(DecimalComparatorExpression),
+    TextComparatorExpression(TextComparatorExpression),
 }
 
 #[derive(Debug)]
@@ -117,21 +120,21 @@ enum LogicalOperatorUnary {
 
 // Control Flow Ops
 
-#[derive(Debug)]
-enum ControlFlowResultType {
-    Number,
-    Decimal,
-    Boolean,
-    Text,
-}
+// #[derive(Debug)]
+// enum ControlFlowResultType {
+//     Number,
+//     Decimal,
+//     Boolean,
+//     Text,
+// }
 
-#[derive(Debug)]
-enum ControlFlowArgType {
-    Number,
-    Decimal,
-    Boolean,
-    Text,
-}
+// #[derive(Debug)]
+// enum ControlFlowArgType {
+//     Number,
+//     Decimal,
+//     Boolean,
+//     Text,
+// }
 
 // match expr {
 //  expr11: expr12
@@ -139,23 +142,44 @@ enum ControlFlowArgType {
 //  expr31: expr32
 //  expr4
 // }
+// #[derive(Debug)]
+// enum ControlFlowArg {
+//     Expression(
+//         LispExpression,
+//         Vec<(LispExpression, LispExpression)>,
+//         LispExpression,
+//     ),
+// }
+
+// #[derive(Debug)]
+// enum ControlFlowOperator {
+//     Match,
+// }
+
 #[derive(Debug)]
-enum ControlFlowArg {
-    Expression(
-        LispExpression,
-        Vec<(LispExpression, LispExpression)>,
-        LispExpression,
-    ),
+enum NumberComparatorArg {
+    Number(i32),
+    ArithmeticExpression(ArithmeticExpression)
 }
 
 #[derive(Debug)]
-enum ControlFlowOperator {
-    Match,
+enum DecimalComparatorArg {
+    Decimal(BigDecimal),
+    ArithmeticExpression(ArithmeticExpression)
 }
 
-// Note. In some places, tuples or slices could be used here instead of arrays
 #[derive(Debug)]
-enum LispExpression {
+enum TextComparatorArg {
+    Text(String),
+    ArithmeticExpression(ArithmeticExpression),
+    NumberComparatorExpression(NumberComparatorExpression),
+    DecimalComparatorExpression(DecimalComparatorExpression),
+    TextComparatorExpression(TextComparatorExpression),
+    LogicalExpression(LogicalExpression)
+}
+
+#[derive(Debug)]
+enum ArithmeticExpression {
     Add {
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
         args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
@@ -176,6 +200,10 @@ enum LispExpression {
         types: (ArithmeticArgType, Vec<ArithmeticArgType>),
         args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
     },
+}
+
+#[derive(Debug)]
+enum NumberComparatorExpression {
     Equals {
         types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
@@ -196,6 +224,58 @@ enum LispExpression {
         types: ComparatorArgType,
         args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
     },
+}
+
+#[derive(Debug)]
+enum DecimalComparatorExpression {
+    Equals {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    GreaterThan {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    LessThan {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    GreaterThanEquals {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    LessThanEquals {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+}
+
+#[derive(Debug)]
+enum TextComparatorExpression {
+    Equals {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    GreaterThan {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    LessThan {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    GreaterThanEquals {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+    LessThanEquals {
+        types: ComparatorArgType,
+        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    },
+}
+
+#[derive(Debug)]
+enum LogicalExpression {
     And {
         args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
     },
@@ -205,14 +285,76 @@ enum LispExpression {
     Not {
         args: Box<LogicalArg>,
     },
-    Match {
-        types: (ControlFlowArgType, ControlFlowArgType),
-        args: Box<(
-            LispExpression,
-            Vec<(LispExpression, LispExpression)>,
-            LispExpression,
-        )>,
-    },
+}
+
+// #[derive(Debug)]
+// enum AnyExpression {
+//     ArithmeticExpression(ArithmeticExpression),
+//     ComparatorExpression(ComparatorExpression),
+//     LogicalExpression(LogicalExpression),
+//     // ControlFlowExpression(ControlFlowExpression),
+// }
+
+// Note. In some places, tuples or slices could be used here instead of arrays
+#[derive(Debug)]
+enum LispExpression {
+    // Add {
+    //     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
+    //     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+    // },
+    // Multiply {
+    //     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
+    //     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+    // },
+    // Subtract {
+    //     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
+    //     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+    // },
+    // Divide {
+    //     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
+    //     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+    // },
+    // Modulus {
+    //     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
+    //     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
+    // },
+    // Equals {
+    //     types: ComparatorArgType,
+    //     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    // },
+    // GreaterThan {
+    //     types: ComparatorArgType,
+    //     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    // },
+    // LessThan {
+    //     types: ComparatorArgType,
+    //     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    // },
+    // GreaterThanEquals {
+    //     types: ComparatorArgType,
+    //     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    // },
+    // LessThanEquals {
+    //     types: ComparatorArgType,
+    //     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
+    // },
+    // And {
+    //     args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
+    // },
+    // Or {
+    //     args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
+    // },
+    // Not {
+    //     args: Box<LogicalArg>,
+    // },
+    // Match {
+    //     types: (ControlFlowArgType, ControlFlowArgType),
+    //     args: Box<(
+    //         LispExpression,
+    //         Vec<(LispExpression, LispExpression)>,
+    //         LispExpression,
+    //     )>,
+    // },
 }
 
 #[derive(Debug)]
@@ -259,264 +401,264 @@ enum LispExpressionResult {
 }
 
 impl LispExpression {
-    fn eval(
-        result_type: LispExpressionResultType,
-        expr: &LispExpression,
-    ) -> Result<LispExpressionResult, CustomError> {
-        match expr {
-            LispExpression::Add { types, args } => {
-                match Self::arithmetic_op(
-                    match result_type {
-                        LispExpressionResultType::Number => ArithmeticResultType::Number,
-                        LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
-                        LispExpressionResultType::Text => ArithmeticResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    types,
-                    args,
-                    ArithmeticOperator::Add,
-                ) {
-                    Ok(v) => match v {
-                        ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-                        ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-                        ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Multiply { types, args } => {
-                match Self::arithmetic_op(
-                    match result_type {
-                        LispExpressionResultType::Number => ArithmeticResultType::Number,
-                        LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
-                        LispExpressionResultType::Text => ArithmeticResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    types,
-                    args,
-                    ArithmeticOperator::Multiply,
-                ) {
-                    Ok(v) => match v {
-                        ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-                        ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-                        ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Subtract { types, args } => {
-                match Self::arithmetic_op(
-                    match result_type {
-                        LispExpressionResultType::Number => ArithmeticResultType::Number,
-                        LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
-                        LispExpressionResultType::Text => ArithmeticResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    types,
-                    args,
-                    ArithmeticOperator::Subtract,
-                ) {
-                    Ok(v) => match v {
-                        ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-                        ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-                        ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Divide { types, args } => {
-                match Self::arithmetic_op(
-                    match result_type {
-                        LispExpressionResultType::Number => ArithmeticResultType::Number,
-                        LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
-                        LispExpressionResultType::Text => ArithmeticResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    types,
-                    args,
-                    ArithmeticOperator::Divide,
-                ) {
-                    Ok(v) => match v {
-                        ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-                        ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-                        ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Modulus { types, args } => {
-                match Self::arithmetic_op(
-                    match result_type {
-                        LispExpressionResultType::Number => ArithmeticResultType::Number,
-                        LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
-                        LispExpressionResultType::Text => ArithmeticResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    types,
-                    args,
-                    ArithmeticOperator::Modulus,
-                ) {
-                    Ok(v) => match v {
-                        ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-                        ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-                        ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Equals { types, args } => match Self::comparator_op(
-                match result_type {
-                    LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
-                    LispExpressionResultType::Text => ComparatorResultType::Text,
-                    _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                },
-                types,
-                args,
-                ComparatorOperator::Equals,
-            ) {
-                Ok(v) => match v {
-                    ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                    ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                },
-                Err(e) => Err(e),
-            },
-            LispExpression::GreaterThan { types, args } => match Self::comparator_op(
-                match result_type {
-                    LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
-                    LispExpressionResultType::Text => ComparatorResultType::Text,
-                    _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                },
-                types,
-                args,
-                ComparatorOperator::GreaterThan,
-            ) {
-                Ok(v) => match v {
-                    ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                    ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                },
-                Err(e) => Err(e),
-            },
-            LispExpression::LessThan { types, args } => match Self::comparator_op(
-                match result_type {
-                    LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
-                    LispExpressionResultType::Text => ComparatorResultType::Text,
-                    _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                },
-                types,
-                args,
-                ComparatorOperator::LessThan,
-            ) {
-                Ok(v) => match v {
-                    ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                    ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                },
-                Err(e) => Err(e),
-            },
-            LispExpression::GreaterThanEquals { types, args } => match Self::comparator_op(
-                match result_type {
-                    LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
-                    LispExpressionResultType::Text => ComparatorResultType::Text,
-                    _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                },
-                types,
-                args,
-                ComparatorOperator::GreaterThanEquals,
-            ) {
-                Ok(v) => match v {
-                    ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                    ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                },
-                Err(e) => Err(e),
-            },
-            LispExpression::LessThanEquals { types, args } => match Self::comparator_op(
-                match result_type {
-                    LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
-                    LispExpressionResultType::Text => ComparatorResultType::Text,
-                    _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                },
-                types,
-                args,
-                ComparatorOperator::LessThanEquals,
-            ) {
-                Ok(v) => match v {
-                    ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                    ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                },
-                Err(e) => Err(e),
-            },
-            LispExpression::And { args } => {
-                match Self::logical_op_binary(
-                    match result_type {
-                        LispExpressionResultType::Boolean => LogicalResultType::Boolean,
-                        LispExpressionResultType::Text => LogicalResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    args,
-                    LogicalOperatorBinary::And,
-                ) {
-                    Ok(v) => match v {
-                        LogicalResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                        LogicalResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Or { args } => {
-                match Self::logical_op_binary(
-                    match result_type {
-                        LispExpressionResultType::Boolean => LogicalResultType::Boolean,
-                        LispExpressionResultType::Text => LogicalResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    args,
-                    LogicalOperatorBinary::Or,
-                ) {
-                    Ok(v) => match v {
-                        LogicalResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                        LogicalResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Not { args } => {
-                match Self::logical_op_unary(
-                    match result_type {
-                        LispExpressionResultType::Boolean => LogicalResultType::Boolean,
-                        LispExpressionResultType::Text => LogicalResultType::Text,
-                        _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    args,
-                    LogicalOperatorUnary::Not,
-                ) {
-                    Ok(v) => match v {
-                        LogicalResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                        LogicalResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-            LispExpression::Match { types, args } => {
-                match Self::control_flow_op(
-                    match result_type {
-                        LispExpressionResultType::Number => ControlFlowResultType::Number,
-                        LispExpressionResultType::Decimal => ControlFlowResultType::Decimal,
-                        LispExpressionResultType::Boolean => ControlFlowResultType::Boolean,
-                        LispExpressionResultType::Text => ControlFlowResultType::Text,
-                    },
-                    types,
-                    args,
-                ) {
-                    Ok(v) => match v {
-                        ControlFlowResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-                        ControlFlowResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-                        ControlFlowResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-                        ControlFlowResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-                    },
-                    Err(e) => Err(e),
-                }
-            }
-        }
-    }
+    // fn eval(
+    //     result_type: LispExpressionResultType,
+    //     expr: &LispExpression,
+    // ) -> Result<LispExpressionResult, CustomError> {
+    //     match expr {
+    //         LispExpression::Add { types, args } => {
+    //             match Self::arithmetic_op(
+    //                 match result_type {
+    //                     LispExpressionResultType::Number => ArithmeticResultType::Number,
+    //                     LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
+    //                     LispExpressionResultType::Text => ArithmeticResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 types,
+    //                 args,
+    //                 ArithmeticOperator::Add,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
+    //                     ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
+    //                     ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Multiply { types, args } => {
+    //             match Self::arithmetic_op(
+    //                 match result_type {
+    //                     LispExpressionResultType::Number => ArithmeticResultType::Number,
+    //                     LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
+    //                     LispExpressionResultType::Text => ArithmeticResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 types,
+    //                 args,
+    //                 ArithmeticOperator::Multiply,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
+    //                     ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
+    //                     ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Subtract { types, args } => {
+    //             match Self::arithmetic_op(
+    //                 match result_type {
+    //                     LispExpressionResultType::Number => ArithmeticResultType::Number,
+    //                     LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
+    //                     LispExpressionResultType::Text => ArithmeticResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 types,
+    //                 args,
+    //                 ArithmeticOperator::Subtract,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
+    //                     ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
+    //                     ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Divide { types, args } => {
+    //             match Self::arithmetic_op(
+    //                 match result_type {
+    //                     LispExpressionResultType::Number => ArithmeticResultType::Number,
+    //                     LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
+    //                     LispExpressionResultType::Text => ArithmeticResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 types,
+    //                 args,
+    //                 ArithmeticOperator::Divide,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
+    //                     ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
+    //                     ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Modulus { types, args } => {
+    //             match Self::arithmetic_op(
+    //                 match result_type {
+    //                     LispExpressionResultType::Number => ArithmeticResultType::Number,
+    //                     LispExpressionResultType::Decimal => ArithmeticResultType::Decimal,
+    //                     LispExpressionResultType::Text => ArithmeticResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 types,
+    //                 args,
+    //                 ArithmeticOperator::Modulus,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     ArithmeticResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
+    //                     ArithmeticResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
+    //                     ArithmeticResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Equals { types, args } => match Self::comparator_op(
+    //             match result_type {
+    //                 LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
+    //                 LispExpressionResultType::Text => ComparatorResultType::Text,
+    //                 _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //             },
+    //             types,
+    //             args,
+    //             ComparatorOperator::Equals,
+    //         ) {
+    //             Ok(v) => match v {
+    //                 ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                 ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //             },
+    //             Err(e) => Err(e),
+    //         },
+    //         LispExpression::GreaterThan { types, args } => match Self::comparator_op(
+    //             match result_type {
+    //                 LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
+    //                 LispExpressionResultType::Text => ComparatorResultType::Text,
+    //                 _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //             },
+    //             types,
+    //             args,
+    //             ComparatorOperator::GreaterThan,
+    //         ) {
+    //             Ok(v) => match v {
+    //                 ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                 ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //             },
+    //             Err(e) => Err(e),
+    //         },
+    //         LispExpression::LessThan { types, args } => match Self::comparator_op(
+    //             match result_type {
+    //                 LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
+    //                 LispExpressionResultType::Text => ComparatorResultType::Text,
+    //                 _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //             },
+    //             types,
+    //             args,
+    //             ComparatorOperator::LessThan,
+    //         ) {
+    //             Ok(v) => match v {
+    //                 ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                 ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //             },
+    //             Err(e) => Err(e),
+    //         },
+    //         LispExpression::GreaterThanEquals { types, args } => match Self::comparator_op(
+    //             match result_type {
+    //                 LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
+    //                 LispExpressionResultType::Text => ComparatorResultType::Text,
+    //                 _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //             },
+    //             types,
+    //             args,
+    //             ComparatorOperator::GreaterThanEquals,
+    //         ) {
+    //             Ok(v) => match v {
+    //                 ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                 ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //             },
+    //             Err(e) => Err(e),
+    //         },
+    //         LispExpression::LessThanEquals { types, args } => match Self::comparator_op(
+    //             match result_type {
+    //                 LispExpressionResultType::Boolean => ComparatorResultType::Boolean,
+    //                 LispExpressionResultType::Text => ComparatorResultType::Text,
+    //                 _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //             },
+    //             types,
+    //             args,
+    //             ComparatorOperator::LessThanEquals,
+    //         ) {
+    //             Ok(v) => match v {
+    //                 ComparatorResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                 ComparatorResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //             },
+    //             Err(e) => Err(e),
+    //         },
+    //         LispExpression::And { args } => {
+    //             match Self::logical_op_binary(
+    //                 match result_type {
+    //                     LispExpressionResultType::Boolean => LogicalResultType::Boolean,
+    //                     LispExpressionResultType::Text => LogicalResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 args,
+    //                 LogicalOperatorBinary::And,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     LogicalResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                     LogicalResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Or { args } => {
+    //             match Self::logical_op_binary(
+    //                 match result_type {
+    //                     LispExpressionResultType::Boolean => LogicalResultType::Boolean,
+    //                     LispExpressionResultType::Text => LogicalResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 args,
+    //                 LogicalOperatorBinary::Or,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     LogicalResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                     LogicalResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         LispExpression::Not { args } => {
+    //             match Self::logical_op_unary(
+    //                 match result_type {
+    //                     LispExpressionResultType::Boolean => LogicalResultType::Boolean,
+    //                     LispExpressionResultType::Text => LogicalResultType::Text,
+    //                     _ => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 args,
+    //                 LogicalOperatorUnary::Not,
+    //             ) {
+    //                 Ok(v) => match v {
+    //                     LogicalResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //                     LogicalResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             }
+    //         }
+    //         // LispExpression::Match { types, args } => {
+    //         //     match Self::control_flow_op(
+    //         //         match result_type {
+    //         //             LispExpressionResultType::Number => ControlFlowResultType::Number,
+    //         //             LispExpressionResultType::Decimal => ControlFlowResultType::Decimal,
+    //         //             LispExpressionResultType::Boolean => ControlFlowResultType::Boolean,
+    //         //             LispExpressionResultType::Text => ControlFlowResultType::Text,
+    //         //         },
+    //         //         types,
+    //         //         args,
+    //         //     ) {
+    //         //         Ok(v) => match v {
+    //         //             ControlFlowResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
+    //         //             ControlFlowResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
+    //         //             ControlFlowResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
+    //         //             ControlFlowResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
+    //         //         },
+    //         //         Err(e) => Err(e),
+    //         //     }
+    //         // }
+    //     }
+    // }
 
     fn get_text(expr: &LispExpression) -> Result<String, CustomError> {
         // Maybe this is where expected result types could override the ones below
@@ -1192,641 +1334,641 @@ impl LispExpression {
         }
     }
 
-    fn get_result_type(arg_type: &ControlFlowArgType) -> LispExpressionResultType {
-        match arg_type {
-            ControlFlowArgType::Number => LispExpressionResultType::Number,
-            ControlFlowArgType::Decimal => LispExpressionResultType::Decimal,
-            ControlFlowArgType::Boolean => LispExpressionResultType::Boolean,
-            ControlFlowArgType::Text => LispExpressionResultType::Text,
-        }
-    }
+    // fn get_result_type(arg_type: &ControlFlowArgType) -> LispExpressionResultType {
+    //     match arg_type {
+    //         ControlFlowArgType::Number => LispExpressionResultType::Number,
+    //         ControlFlowArgType::Decimal => LispExpressionResultType::Decimal,
+    //         ControlFlowArgType::Boolean => LispExpressionResultType::Boolean,
+    //         ControlFlowArgType::Text => LispExpressionResultType::Text,
+    //     }
+    // }
 
-    fn control_flow_op(
-        result_type: ControlFlowResultType,
-        types: &(ControlFlowArgType, ControlFlowArgType),
-        args: &Box<(
-            LispExpression,
-            Vec<(LispExpression, LispExpression)>,
-            LispExpression,
-        )>,
-    ) -> Result<ControlFlowResult, CustomError> {
-        match args.1.is_empty() {
-            true => match LispExpression::get_result_type(&types.1) {
-                LispExpressionResultType::Number => match LispExpression::get_number(&args.2) {
-                    Ok(v1) => match result_type {
-                        ControlFlowResultType::Number => Ok(ControlFlowResult::Number(v1)),
-                        ControlFlowResultType::Decimal => match BigDecimal::from_i32(v1) {
-                            Some(v2) => Ok(ControlFlowResult::Decimal(v2)),
-                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                        },
-                        ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
-                        _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    Err(e) => Err(e),
-                },
-                LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.2) {
-                    Ok(v1) => match result_type {
-                        ControlFlowResultType::Number => match v1.to_i32() {
-                            Some(v2) => Ok(ControlFlowResult::Number(v2)),
-                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                        },
-                        ControlFlowResultType::Decimal => Ok(ControlFlowResult::Decimal(v1)),
-                        ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
-                        _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    Err(e) => Err(e),
-                },
-                LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.2) {
-                    Ok(v1) => match result_type {
-                        ControlFlowResultType::Boolean => Ok(ControlFlowResult::Boolean(v1)),
-                        ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
-                        _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    Err(e) => Err(e),
-                },
-                LispExpressionResultType::Text => match LispExpression::get_text(&args.2) {
-                    Ok(v1) => match result_type {
-                        ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1)),
-                        _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    Err(e) => Err(e),
-                },
-            },
-            false => match LispExpression::get_result_type(&types.0) {
-                LispExpressionResultType::Number => match LispExpression::get_number(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&types.1) {
-                        LispExpressionResultType::Number => {
-                            let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-                            let result: Result<(bool, i32), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_number(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_number(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Number(v1.1)),
-                                    false => match LispExpression::get_number(&args.2) {
-                                        Ok(v1) => match result_type {
-                                            ControlFlowResultType::Number => {
-                                                Ok(ControlFlowResult::Number(v1))
-                                            }
-                                            ControlFlowResultType::Decimal => {
-                                                match BigDecimal::from_i32(v1) {
-                                                    Some(v2) => Ok(ControlFlowResult::Decimal(v2)),
-                                                    None => Err(CustomError::Message(
-                                                        UNEXPECTED_ERROR.to_string(),
-                                                    )),
-                                                }
-                                            }
-                                            ControlFlowResultType::Text => {
-                                                Ok(ControlFlowResult::Text(v1.to_string()))
-                                            }
-                                            _ => Err(CustomError::Message(
-                                                UNEXPECTED_ERROR.to_string(),
-                                            )),
-                                        },
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Decimal => {
-                            let init: Result<(bool, BigDecimal), CustomError> =
-                                match BigDecimal::from_i32(0) {
-                                    Some(v1) => Ok((false, v1)),
-                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                                };
-                            let result: Result<(bool, BigDecimal), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_number(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_decimal(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Decimal(v1.1)),
-                                    false => match LispExpression::get_decimal(&args.2) {
-                                        Ok(v1) => match result_type {
-                                            ControlFlowResultType::Number => match v1.to_i32() {
-                                                Some(v2) => Ok(ControlFlowResult::Number(v2)),
-                                                None => Err(CustomError::Message(
-                                                    UNEXPECTED_ERROR.to_string(),
-                                                )),
-                                            },
-                                            ControlFlowResultType::Decimal => {
-                                                Ok(ControlFlowResult::Decimal(v1))
-                                            }
-                                            ControlFlowResultType::Text => {
-                                                Ok(ControlFlowResult::Text(v1.to_string()))
-                                            }
-                                            _ => Err(CustomError::Message(
-                                                UNEXPECTED_ERROR.to_string(),
-                                            )),
-                                        },
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Boolean => {
-                            let init: Result<(bool, bool), CustomError> = Ok((false, false));
-                            let result: Result<(bool, bool), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_number(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_boolean(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Boolean(v1.1)),
-                                    false => match LispExpression::get_boolean(&args.2) {
-                                        Ok(v1) => match result_type {
-                                            ControlFlowResultType::Boolean => {
-                                                Ok(ControlFlowResult::Boolean(v1))
-                                            }
-                                            ControlFlowResultType::Text => {
-                                                Ok(ControlFlowResult::Text(v1.to_string()))
-                                            }
-                                            _ => Err(CustomError::Message(
-                                                UNEXPECTED_ERROR.to_string(),
-                                            )),
-                                        },
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Text => {
-                            let init: Result<(bool, String), CustomError> =
-                                Ok((false, String::from("")));
-                            let result: Result<(bool, String), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_number(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_text(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Text(v1.1)),
-                                    false => match LispExpression::get_text(&args.2) {
-                                        Ok(v1) => match result_type {
-                                            ControlFlowResultType::Text => {
-                                                Ok(ControlFlowResult::Text(v1))
-                                            }
-                                            _ => Err(CustomError::Message(
-                                                UNEXPECTED_ERROR.to_string(),
-                                            )),
-                                        },
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                    },
-                    Err(e) => Err(e),
-                },
-                LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&types.1) {
-                        LispExpressionResultType::Number => {
-                            let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-                            let result: Result<(bool, i32), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_decimal(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_number(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Number(v1.1)),
-                                    false => match LispExpression::get_number(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Number(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Decimal => {
-                            let init: Result<(bool, BigDecimal), CustomError> =
-                                match BigDecimal::from_i32(0) {
-                                    Some(v1) => Ok((false, v1)),
-                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                                };
-                            let result: Result<(bool, BigDecimal), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_decimal(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_decimal(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Decimal(v1.1)),
-                                    false => match LispExpression::get_decimal(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Boolean => {
-                            let init: Result<(bool, bool), CustomError> = Ok((false, false));
-                            let result: Result<(bool, bool), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_decimal(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_boolean(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Boolean(v1.1)),
-                                    false => match LispExpression::get_boolean(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Text => {
-                            let init: Result<(bool, String), CustomError> =
-                                Ok((false, String::from("")));
-                            let result: Result<(bool, String), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_decimal(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_text(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Text(v1.1)),
-                                    false => match LispExpression::get_text(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Text(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                    },
-                    Err(e) => Err(e),
-                },
-                LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&types.1) {
-                        LispExpressionResultType::Number => {
-                            let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-                            let result: Result<(bool, i32), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_boolean(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_number(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Number(v1.1)),
-                                    false => match LispExpression::get_number(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Number(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Decimal => {
-                            let init: Result<(bool, BigDecimal), CustomError> =
-                                match BigDecimal::from_i32(0) {
-                                    Some(v1) => Ok((false, v1)),
-                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                                };
-                            let result: Result<(bool, BigDecimal), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_boolean(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_decimal(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Decimal(v1.1)),
-                                    false => match LispExpression::get_decimal(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Boolean => {
-                            let init: Result<(bool, bool), CustomError> = Ok((false, false));
-                            let result: Result<(bool, bool), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_boolean(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_boolean(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Boolean(v1.1)),
-                                    false => match LispExpression::get_boolean(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Text => {
-                            let init: Result<(bool, String), CustomError> =
-                                Ok((false, String::from("")));
-                            let result: Result<(bool, String), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_boolean(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_text(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Text(v1.1)),
-                                    false => match LispExpression::get_text(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Text(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                    },
-                    Err(e) => Err(e),
-                },
-                LispExpressionResultType::Text => match LispExpression::get_text(&args.0) {
-                    Ok(v) => match LispExpression::get_result_type(&types.1) {
-                        LispExpressionResultType::Number => {
-                            let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-                            let result: Result<(bool, i32), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_text(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_number(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Number(v1.1)),
-                                    false => match LispExpression::get_number(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Number(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Decimal => {
-                            let init: Result<(bool, BigDecimal), CustomError> =
-                                match BigDecimal::from_i32(0) {
-                                    Some(v1) => Ok((false, v1)),
-                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                                };
-                            let result: Result<(bool, BigDecimal), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_text(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_decimal(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Decimal(v1.1)),
-                                    false => match LispExpression::get_decimal(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Boolean => {
-                            let init: Result<(bool, bool), CustomError> = Ok((false, false));
-                            let result: Result<(bool, bool), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_text(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_boolean(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Boolean(v1.1)),
-                                    false => match LispExpression::get_boolean(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                        LispExpressionResultType::Text => {
-                            let init: Result<(bool, String), CustomError> =
-                                Ok((false, String::from("")));
-                            let result: Result<(bool, String), CustomError> =
-                                args.1.iter().fold(init, |acc, val| match &acc {
-                                    Ok(v1) => match v1.0 {
-                                        true => acc,
-                                        false => match LispExpression::get_text(&val.0) {
-                                            Ok(v2) => match v == v2 {
-                                                true => match LispExpression::get_text(&val.1) {
-                                                    Ok(v3) => Ok((true, v3)),
-                                                    Err(e) => Err(e),
-                                                },
-                                                false => acc,
-                                            },
-                                            Err(e) => Err(e),
-                                        },
-                                    },
-                                    Err(_) => acc,
-                                });
-                            match result {
-                                Ok(v1) => match v1.0 {
-                                    true => Ok(ControlFlowResult::Text(v1.1)),
-                                    false => match LispExpression::get_text(&args.2) {
-                                        Ok(v1) => Ok(ControlFlowResult::Text(v1)),
-                                        Err(e) => Err(e),
-                                    },
-                                },
-                                Err(e) => Err(e),
-                            }
-                        }
-                    },
-                    Err(e) => Err(e),
-                },
-            },
-        }
-    }
+    // fn control_flow_op(
+    //     result_type: ControlFlowResultType,
+    //     types: &(ControlFlowArgType, ControlFlowArgType),
+    //     args: &Box<(
+    //         LispExpression,
+    //         Vec<(LispExpression, LispExpression)>,
+    //         LispExpression,
+    //     )>,
+    // ) -> Result<ControlFlowResult, CustomError> {
+    //     match args.1.is_empty() {
+    //         true => match LispExpression::get_result_type(&types.1) {
+    //             LispExpressionResultType::Number => match LispExpression::get_number(&args.2) {
+    //                 Ok(v1) => match result_type {
+    //                     ControlFlowResultType::Number => Ok(ControlFlowResult::Number(v1)),
+    //                     ControlFlowResultType::Decimal => match BigDecimal::from_i32(v1) {
+    //                         Some(v2) => Ok(ControlFlowResult::Decimal(v2)),
+    //                         None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                     },
+    //                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
+    //                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //             LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.2) {
+    //                 Ok(v1) => match result_type {
+    //                     ControlFlowResultType::Number => match v1.to_i32() {
+    //                         Some(v2) => Ok(ControlFlowResult::Number(v2)),
+    //                         None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                     },
+    //                     ControlFlowResultType::Decimal => Ok(ControlFlowResult::Decimal(v1)),
+    //                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
+    //                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //             LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.2) {
+    //                 Ok(v1) => match result_type {
+    //                     ControlFlowResultType::Boolean => Ok(ControlFlowResult::Boolean(v1)),
+    //                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
+    //                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //             LispExpressionResultType::Text => match LispExpression::get_text(&args.2) {
+    //                 Ok(v1) => match result_type {
+    //                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1)),
+    //                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //         },
+    //         false => match LispExpression::get_result_type(&types.0) {
+    //             LispExpressionResultType::Number => match LispExpression::get_number(&args.0) {
+    //                 Ok(v) => match LispExpression::get_result_type(&types.1) {
+    //                     LispExpressionResultType::Number => {
+    //                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
+    //                         let result: Result<(bool, i32), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_number(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_number(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Number(v1.1)),
+    //                                 false => match LispExpression::get_number(&args.2) {
+    //                                     Ok(v1) => match result_type {
+    //                                         ControlFlowResultType::Number => {
+    //                                             Ok(ControlFlowResult::Number(v1))
+    //                                         }
+    //                                         ControlFlowResultType::Decimal => {
+    //                                             match BigDecimal::from_i32(v1) {
+    //                                                 Some(v2) => Ok(ControlFlowResult::Decimal(v2)),
+    //                                                 None => Err(CustomError::Message(
+    //                                                     UNEXPECTED_ERROR.to_string(),
+    //                                                 )),
+    //                                             }
+    //                                         }
+    //                                         ControlFlowResultType::Text => {
+    //                                             Ok(ControlFlowResult::Text(v1.to_string()))
+    //                                         }
+    //                                         _ => Err(CustomError::Message(
+    //                                             UNEXPECTED_ERROR.to_string(),
+    //                                         )),
+    //                                     },
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Decimal => {
+    //                         let init: Result<(bool, BigDecimal), CustomError> =
+    //                             match BigDecimal::from_i32(0) {
+    //                                 Some(v1) => Ok((false, v1)),
+    //                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                             };
+    //                         let result: Result<(bool, BigDecimal), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_number(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_decimal(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
+    //                                 false => match LispExpression::get_decimal(&args.2) {
+    //                                     Ok(v1) => match result_type {
+    //                                         ControlFlowResultType::Number => match v1.to_i32() {
+    //                                             Some(v2) => Ok(ControlFlowResult::Number(v2)),
+    //                                             None => Err(CustomError::Message(
+    //                                                 UNEXPECTED_ERROR.to_string(),
+    //                                             )),
+    //                                         },
+    //                                         ControlFlowResultType::Decimal => {
+    //                                             Ok(ControlFlowResult::Decimal(v1))
+    //                                         }
+    //                                         ControlFlowResultType::Text => {
+    //                                             Ok(ControlFlowResult::Text(v1.to_string()))
+    //                                         }
+    //                                         _ => Err(CustomError::Message(
+    //                                             UNEXPECTED_ERROR.to_string(),
+    //                                         )),
+    //                                     },
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Boolean => {
+    //                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
+    //                         let result: Result<(bool, bool), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_number(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_boolean(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
+    //                                 false => match LispExpression::get_boolean(&args.2) {
+    //                                     Ok(v1) => match result_type {
+    //                                         ControlFlowResultType::Boolean => {
+    //                                             Ok(ControlFlowResult::Boolean(v1))
+    //                                         }
+    //                                         ControlFlowResultType::Text => {
+    //                                             Ok(ControlFlowResult::Text(v1.to_string()))
+    //                                         }
+    //                                         _ => Err(CustomError::Message(
+    //                                             UNEXPECTED_ERROR.to_string(),
+    //                                         )),
+    //                                     },
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Text => {
+    //                         let init: Result<(bool, String), CustomError> =
+    //                             Ok((false, String::from("")));
+    //                         let result: Result<(bool, String), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_number(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_text(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Text(v1.1)),
+    //                                 false => match LispExpression::get_text(&args.2) {
+    //                                     Ok(v1) => match result_type {
+    //                                         ControlFlowResultType::Text => {
+    //                                             Ok(ControlFlowResult::Text(v1))
+    //                                         }
+    //                                         _ => Err(CustomError::Message(
+    //                                             UNEXPECTED_ERROR.to_string(),
+    //                                         )),
+    //                                     },
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //             LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.0) {
+    //                 Ok(v) => match LispExpression::get_result_type(&types.1) {
+    //                     LispExpressionResultType::Number => {
+    //                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
+    //                         let result: Result<(bool, i32), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_decimal(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_number(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Number(v1.1)),
+    //                                 false => match LispExpression::get_number(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Number(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Decimal => {
+    //                         let init: Result<(bool, BigDecimal), CustomError> =
+    //                             match BigDecimal::from_i32(0) {
+    //                                 Some(v1) => Ok((false, v1)),
+    //                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                             };
+    //                         let result: Result<(bool, BigDecimal), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_decimal(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_decimal(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
+    //                                 false => match LispExpression::get_decimal(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Boolean => {
+    //                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
+    //                         let result: Result<(bool, bool), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_decimal(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_boolean(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
+    //                                 false => match LispExpression::get_boolean(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Text => {
+    //                         let init: Result<(bool, String), CustomError> =
+    //                             Ok((false, String::from("")));
+    //                         let result: Result<(bool, String), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_decimal(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_text(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Text(v1.1)),
+    //                                 false => match LispExpression::get_text(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Text(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //             LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.0) {
+    //                 Ok(v) => match LispExpression::get_result_type(&types.1) {
+    //                     LispExpressionResultType::Number => {
+    //                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
+    //                         let result: Result<(bool, i32), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_boolean(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_number(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Number(v1.1)),
+    //                                 false => match LispExpression::get_number(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Number(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Decimal => {
+    //                         let init: Result<(bool, BigDecimal), CustomError> =
+    //                             match BigDecimal::from_i32(0) {
+    //                                 Some(v1) => Ok((false, v1)),
+    //                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                             };
+    //                         let result: Result<(bool, BigDecimal), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_boolean(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_decimal(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
+    //                                 false => match LispExpression::get_decimal(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Boolean => {
+    //                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
+    //                         let result: Result<(bool, bool), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_boolean(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_boolean(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
+    //                                 false => match LispExpression::get_boolean(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Text => {
+    //                         let init: Result<(bool, String), CustomError> =
+    //                             Ok((false, String::from("")));
+    //                         let result: Result<(bool, String), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_boolean(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_text(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Text(v1.1)),
+    //                                 false => match LispExpression::get_text(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Text(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //             LispExpressionResultType::Text => match LispExpression::get_text(&args.0) {
+    //                 Ok(v) => match LispExpression::get_result_type(&types.1) {
+    //                     LispExpressionResultType::Number => {
+    //                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
+    //                         let result: Result<(bool, i32), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_text(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_number(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Number(v1.1)),
+    //                                 false => match LispExpression::get_number(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Number(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Decimal => {
+    //                         let init: Result<(bool, BigDecimal), CustomError> =
+    //                             match BigDecimal::from_i32(0) {
+    //                                 Some(v1) => Ok((false, v1)),
+    //                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+    //                             };
+    //                         let result: Result<(bool, BigDecimal), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_text(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_decimal(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
+    //                                 false => match LispExpression::get_decimal(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Boolean => {
+    //                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
+    //                         let result: Result<(bool, bool), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_text(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_boolean(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
+    //                                 false => match LispExpression::get_boolean(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                     LispExpressionResultType::Text => {
+    //                         let init: Result<(bool, String), CustomError> =
+    //                             Ok((false, String::from("")));
+    //                         let result: Result<(bool, String), CustomError> =
+    //                             args.1.iter().fold(init, |acc, val| match &acc {
+    //                                 Ok(v1) => match v1.0 {
+    //                                     true => acc,
+    //                                     false => match LispExpression::get_text(&val.0) {
+    //                                         Ok(v2) => match v == v2 {
+    //                                             true => match LispExpression::get_text(&val.1) {
+    //                                                 Ok(v3) => Ok((true, v3)),
+    //                                                 Err(e) => Err(e),
+    //                                             },
+    //                                             false => acc,
+    //                                         },
+    //                                         Err(e) => Err(e),
+    //                                     },
+    //                                 },
+    //                                 Err(_) => acc,
+    //                             });
+    //                         match result {
+    //                             Ok(v1) => match v1.0 {
+    //                                 true => Ok(ControlFlowResult::Text(v1.1)),
+    //                                 false => match LispExpression::get_text(&args.2) {
+    //                                     Ok(v1) => Ok(ControlFlowResult::Text(v1)),
+    //                                     Err(e) => Err(e),
+    //                                 },
+    //                             },
+    //                             Err(e) => Err(e),
+    //                         }
+    //                     }
+    //                 },
+    //                 Err(e) => Err(e),
+    //             },
+    //         },
+    //     }
+    // }
 }
 
 // Use rust-decimal over bigdecimal
