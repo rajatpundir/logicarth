@@ -17,6 +17,7 @@ const UNEXPECTED_ERROR: &str = "Unexpected Error";
 // 2. Implement concat, regex, identity
 // 3. Implement symbols
 // 4. Implement dot operator
+// 5. Write test cases and build some audio visual documentation
 #[derive(Debug)]
 enum CustomError {
     Message(String),
@@ -33,6 +34,13 @@ enum ArithmeticResultType {
 }
 
 #[derive(Debug)]
+enum ArithmeticResult {
+    Number(i32),
+    Decimal(BigDecimal),
+    Text(String),
+}
+
+#[derive(Debug)]
 enum ArithmeticOperator {
     Add,
     Multiply,
@@ -41,16 +49,233 @@ enum ArithmeticOperator {
     Modulus,
 }
 
+// NUMBER ARITHMETIC
+
 #[derive(Debug)]
 enum NumberArithmeticArg {
+    // Note. Decimal is not allowed as an arg to avoid loss of precision
     Number(i32),
     NumberArithmeticExpression(NumberArithmeticExpression),
     // Expression(ArithmeticControlFlowExpression),
 }
 
+#[derive(Debug)]
+enum NumberArithmeticExpression {
+    Add(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
+    Multiply(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
+    Subtract(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
+    Divide(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
+    Modulus(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
+}
 
+impl NumberArithmeticExpression {
+    fn unwrap_number(&self) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number)? {
+            ArithmeticResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
 
-// Comparator Ops
+    fn unwrap_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal)? {
+            ArithmeticResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn unwrap_text(&self) -> Result<String, CustomError> {
+        match self.eval(ArithmeticResultType::Text)? {
+            ArithmeticResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
+        let (args, operator) = match self {
+            NumberArithmeticExpression::Add(v) => (v, ArithmeticOperator::Add),
+            NumberArithmeticExpression::Multiply(v) => (v, ArithmeticOperator::Add),
+            NumberArithmeticExpression::Subtract(v) => (v, ArithmeticOperator::Add),
+            NumberArithmeticExpression::Divide(v) => (v, ArithmeticOperator::Add),
+            NumberArithmeticExpression::Modulus(v) => (v, ArithmeticOperator::Add),
+        };
+        let init: Result<i32, CustomError> = match &args.0 {
+            NumberArithmeticArg::Number(v) => Ok(*v),
+            NumberArithmeticArg::NumberArithmeticExpression(v1) => v1.unwrap_number(),
+        };
+        let result: Result<i32, CustomError> = args.1.iter().fold(init, |acc, val| match &acc {
+            Ok(v) => match val {
+                NumberArithmeticArg::Number(v1) => match operator {
+                    ArithmeticOperator::Add => Ok(v + *v1),
+                    ArithmeticOperator::Multiply => Ok(v * *v1),
+                    ArithmeticOperator::Subtract => Ok(v - *v1),
+                    ArithmeticOperator::Divide => Ok(v / *v1),
+                    ArithmeticOperator::Modulus => Ok(v % *v1),
+                },
+                NumberArithmeticArg::NumberArithmeticExpression(v1) => match v1.unwrap_number() {
+                    Ok(v2) => match operator {
+                        ArithmeticOperator::Add => Ok(v + v2),
+                        ArithmeticOperator::Multiply => Ok(v * v2),
+                        ArithmeticOperator::Subtract => Ok(v - v2),
+                        ArithmeticOperator::Divide => Ok(v / v2),
+                        ArithmeticOperator::Modulus => Ok(v % v2),
+                    },
+                    Err(e) => Err(e),
+                },
+            },
+            Err(_) => acc,
+        });
+        match result {
+            Ok(v) => match result_type {
+                ArithmeticResultType::Number => Ok(ArithmeticResult::Number(v)),
+                ArithmeticResultType::Decimal => match BigDecimal::from_i32(v) {
+                    Some(v1) => Ok(ArithmeticResult::Decimal(v1)),
+                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                },
+                ArithmeticResultType::Text => Ok(ArithmeticResult::Text(v.to_string())),
+            },
+            Err(e) => Err(e),
+        }
+    }
+}
+
+// DECIMAL ARITHMETIC
+
+#[derive(Debug)]
+enum DecimalArithmeticArg {
+    // Note. Decimal is not allowed as an arg to avoid loss of precision
+    Number(i32),
+    Decimal(BigDecimal),
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    DecimalArithmeticExpression(DecimalArithmeticExpression),
+    // Expression(ArithmeticControlFlowExpression),
+}
+
+#[derive(Debug)]
+enum DecimalArithmeticExpression {
+    Add(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
+    Multiply(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
+    Subtract(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
+    Divide(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
+    Modulus(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
+}
+
+impl DecimalArithmeticExpression {
+    fn unwrap_number(&self) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number)? {
+            ArithmeticResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn unwrap_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal)? {
+            ArithmeticResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn unwrap_text(&self) -> Result<String, CustomError> {
+        match self.eval(ArithmeticResultType::Text)? {
+            ArithmeticResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
+        let (args, operator) = match self {
+            DecimalArithmeticExpression::Add(v) => (v, ArithmeticOperator::Add),
+            DecimalArithmeticExpression::Multiply(v) => (v, ArithmeticOperator::Add),
+            DecimalArithmeticExpression::Subtract(v) => (v, ArithmeticOperator::Add),
+            DecimalArithmeticExpression::Divide(v) => (v, ArithmeticOperator::Add),
+            DecimalArithmeticExpression::Modulus(v) => (v, ArithmeticOperator::Add),
+        };
+        let mut temp: BigDecimal = match BigDecimal::from_i32(1) {
+            Some(v) => v,
+            None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+        };
+        let init: Result<BigDecimal, CustomError> = match &args.0 {
+            DecimalArithmeticArg::Number(v) => match BigDecimal::from_i32(*v) {
+                Some(v1) => {
+                    temp *= v1;
+                    Ok(temp)
+                }
+                None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+            },
+            DecimalArithmeticArg::Decimal(v1) => {
+                temp *= v1;
+                Ok(temp)
+            }
+            DecimalArithmeticArg::NumberArithmeticExpression(v) => v.unwrap_decimal(),
+            DecimalArithmeticArg::DecimalArithmeticExpression(v) => v.unwrap_decimal(),
+        };
+        let result: Result<BigDecimal, CustomError> =
+            args.1.iter().fold(init, |acc, val| match &acc {
+                Ok(v) => match val {
+                    DecimalArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
+                        Some(v1) => match operator {
+                            ArithmeticOperator::Add => Ok(v + v1),
+                            ArithmeticOperator::Multiply => Ok(v * v1),
+                            ArithmeticOperator::Subtract => Ok(v - v1),
+                            ArithmeticOperator::Divide => Ok(v / v1),
+                            ArithmeticOperator::Modulus => Ok(v % v1),
+                        },
+                        None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    },
+                    DecimalArithmeticArg::Decimal(v1) => match operator {
+                        ArithmeticOperator::Add => Ok(v + v1),
+                        ArithmeticOperator::Multiply => Ok(v * v1),
+                        ArithmeticOperator::Subtract => Ok(v - v1),
+                        ArithmeticOperator::Divide => Ok(v / v1),
+                        ArithmeticOperator::Modulus => Ok(v % v1),
+                    },
+                    DecimalArithmeticArg::NumberArithmeticExpression(v1) => {
+                        match v1.unwrap_decimal() {
+                            Ok(v2) => match operator {
+                                ArithmeticOperator::Add => Ok(v + v2),
+                                ArithmeticOperator::Multiply => Ok(v * v2),
+                                ArithmeticOperator::Subtract => Ok(v - v2),
+                                ArithmeticOperator::Divide => Ok(v / v2),
+                                ArithmeticOperator::Modulus => Ok(v % v2),
+                            },
+                            Err(e) => Err(e),
+                        }
+                    }
+                    DecimalArithmeticArg::DecimalArithmeticExpression(v1) => {
+                        match v1.unwrap_decimal() {
+                            Ok(v2) => match operator {
+                                ArithmeticOperator::Add => Ok(v + v2),
+                                ArithmeticOperator::Multiply => Ok(v * v2),
+                                ArithmeticOperator::Subtract => Ok(v - v2),
+                                ArithmeticOperator::Divide => Ok(v / v2),
+                                ArithmeticOperator::Modulus => Ok(v % v2),
+                            },
+                            Err(e) => Err(e),
+                        }
+                    }
+                },
+                Err(_) => acc,
+            });
+        match result_type {
+            ArithmeticResultType::Number => match result {
+                Ok(v) => match v.to_i32() {
+                    Some(v1) => Ok(ArithmeticResult::Number(v1)),
+                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                },
+                Err(e) => Err(e),
+            },
+            ArithmeticResultType::Decimal => match result {
+                Ok(v) => Ok(ArithmeticResult::Decimal(v)),
+                Err(e) => Err(e),
+            },
+            ArithmeticResultType::Text => match result {
+                Ok(v) => Ok(ArithmeticResult::Text(v.to_string())),
+                Err(e) => Err(e),
+            },
+        }
+    }
+}
+
+// COMPARATOR OPS
 
 #[derive(Debug)]
 enum ComparatorResultType {
@@ -59,16 +284,8 @@ enum ComparatorResultType {
 }
 
 #[derive(Debug)]
-enum ComparatorArgType {
-    Number,
-    Decimal,
-    Text,
-}
-
-#[derive(Debug)]
-enum ComparatorArg {
-    Number(i32),
-    Decimal(BigDecimal),
+enum ComparatorResult {
+    Boolean(bool),
     Text(String),
 }
 
@@ -81,7 +298,464 @@ enum ComparatorOperator {
     LessThanEquals,
 }
 
-// Logical Ops
+// NUMBER COMPARATOR
+
+#[derive(Debug)]
+enum NumberComparatorArg {
+    // Note. Decimal is not allowed as an arg to avoid loss of precision
+    Number(i32),
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    // Expression(ArithmeticControlFlowExpression),
+}
+
+#[derive(Debug)]
+enum NumberComparatorExpression {
+    Equals(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    GreaterThan(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    LessThan(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    GreaterThanEquals(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    LessThanEquals(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+}
+
+impl NumberComparatorExpression {
+    fn unwrap_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn unwrap_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+        let (args, operator) = match self {
+            NumberComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
+            NumberComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
+            NumberComparatorExpression::LessThan(v) => (v, ComparatorOperator::LessThan),
+            NumberComparatorExpression::GreaterThanEquals(v) => {
+                (v, ComparatorOperator::GreaterThanEquals)
+            }
+            NumberComparatorExpression::LessThanEquals(v) => {
+                (v, ComparatorOperator::LessThanEquals)
+            }
+        };
+        let arg0: Result<i32, CustomError> = match &args.0 {
+            NumberComparatorArg::Number(v) => Ok(*v),
+            NumberComparatorArg::NumberArithmeticExpression(v) => v.unwrap_number(),
+        };
+        let arg1: Result<i32, CustomError> = match &args.1 {
+            NumberComparatorArg::Number(v) => Ok(*v),
+            NumberComparatorArg::NumberArithmeticExpression(v) => v.unwrap_number(),
+        };
+        let init: Result<bool, CustomError> = match (arg0, arg1) {
+            (Ok(v), Ok(v1)) => match operator {
+                ComparatorOperator::Equals => Ok(v == v1),
+                ComparatorOperator::GreaterThan => Ok(v < v1),
+                ComparatorOperator::LessThan => Ok(v > v1),
+                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                ComparatorOperator::LessThanEquals => Ok(v >= v1),
+            },
+            (Ok(_), Err(e)) => Err(e),
+            (Err(e), Ok(_)) => Err(e),
+            (Err(e), Err(_)) => Err(e),
+        };
+        match args.2.len() == 0 {
+            true => match init {
+                Ok(v) => match result_type {
+                    ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                    ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                },
+                Err(e) => Err(e),
+            },
+            false => {
+                let evaluated_args: Vec<Result<i32, CustomError>> = std::iter::once(&args.1)
+                    .chain(&args.2)
+                    .map(|val| match val {
+                        NumberComparatorArg::Number(v) => Ok(*v),
+                        NumberComparatorArg::NumberArithmeticExpression(v) => v.unwrap_number(),
+                    })
+                    .collect();
+                let result: Result<bool, CustomError> = evaluated_args
+                    .iter()
+                    .zip(&evaluated_args[1..])
+                    .fold(init, |acc, val| match &acc {
+                        Ok(true) => match val {
+                            (Ok(v1), Ok(v2)) => match operator {
+                                ComparatorOperator::Equals => Ok(v1 == v2),
+                                ComparatorOperator::GreaterThan => Ok(v1 < v2),
+                                ComparatorOperator::LessThan => Ok(v1 > v2),
+                                ComparatorOperator::GreaterThanEquals => Ok(v1 <= v2),
+                                ComparatorOperator::LessThanEquals => Ok(v1 >= v2),
+                            },
+                            (Ok(_), Err(e)) => Err(*e),
+                            (Err(e), Ok(_)) => Err(*e),
+                            (Err(e), Err(_)) => Err(*e),
+                        },
+                        _ => acc,
+                    });
+                match result {
+                    Ok(v) => match result_type {
+                        ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                        ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                    },
+                    Err(e) => Err(e),
+                }
+            }
+        }
+    }
+}
+
+// DECIMAL COMPARATOR
+
+#[derive(Debug)]
+enum DecimalComparatorArg {
+    Number(i32),
+    Decimal(BigDecimal),
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    DecimalArithmeticExpression(DecimalArithmeticExpression),
+    // Expression(ArithmeticControlFlowExpression),
+}
+
+#[derive(Debug)]
+enum DecimalComparatorExpression {
+    Equals(
+        Box<(
+            DecimalComparatorArg,
+            DecimalComparatorArg,
+            Vec<DecimalComparatorArg>,
+        )>,
+    ),
+    GreaterThan(
+        Box<(
+            DecimalComparatorArg,
+            DecimalComparatorArg,
+            Vec<DecimalComparatorArg>,
+        )>,
+    ),
+    LessThan(
+        Box<(
+            DecimalComparatorArg,
+            DecimalComparatorArg,
+            Vec<DecimalComparatorArg>,
+        )>,
+    ),
+    GreaterThanEquals(
+        Box<(
+            DecimalComparatorArg,
+            DecimalComparatorArg,
+            Vec<DecimalComparatorArg>,
+        )>,
+    ),
+    LessThanEquals(
+        Box<(
+            DecimalComparatorArg,
+            DecimalComparatorArg,
+            Vec<DecimalComparatorArg>,
+        )>,
+    ),
+}
+
+impl DecimalComparatorExpression {
+    fn unwrap_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn unwrap_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+        let (args, operator) = match self {
+            DecimalComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
+            DecimalComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
+            DecimalComparatorExpression::LessThan(v) => (v, ComparatorOperator::LessThan),
+            DecimalComparatorExpression::GreaterThanEquals(v) => {
+                (v, ComparatorOperator::GreaterThanEquals)
+            }
+            DecimalComparatorExpression::LessThanEquals(v) => {
+                (v, ComparatorOperator::LessThanEquals)
+            }
+        };
+        let arg0: Result<BigDecimal, CustomError> = match &args.0 {
+            DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
+                Some(v1) => Ok(v1),
+                None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+            },
+            DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
+            DecimalComparatorArg::NumberArithmeticExpression(v) => v.unwrap_decimal(),
+            DecimalComparatorArg::DecimalArithmeticExpression(v) => v.unwrap_decimal(),
+        };
+        let arg1: Result<BigDecimal, CustomError> = match &args.1 {
+            DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
+                Some(v1) => Ok(v1),
+                None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+            },
+            DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
+            DecimalComparatorArg::NumberArithmeticExpression(v) => v.unwrap_decimal(),
+            DecimalComparatorArg::DecimalArithmeticExpression(v) => v.unwrap_decimal(),
+        };
+        let init: Result<bool, CustomError> = match (arg0, arg1) {
+            (Ok(v), Ok(v1)) => match operator {
+                ComparatorOperator::Equals => Ok(v == v1),
+                ComparatorOperator::GreaterThan => Ok(v < v1),
+                ComparatorOperator::LessThan => Ok(v > v1),
+                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                ComparatorOperator::LessThanEquals => Ok(v >= v1),
+            },
+            (Ok(_), Err(e)) => Err(e),
+            (Err(e), Ok(_)) => Err(e),
+            (Err(e), Err(_)) => Err(e),
+        };
+        match args.2.len() == 0 {
+            true => match init {
+                Ok(v) => match result_type {
+                    ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                    ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                },
+                Err(e) => Err(e),
+            },
+            false => {
+                let evaluated_args: Vec<Result<BigDecimal, CustomError>> = std::iter::once(&args.1)
+                    .chain(&args.2)
+                    .map(|val| match val {
+                        DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
+                            Some(v1) => Ok(v1),
+                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                        },
+                        DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
+                        DecimalComparatorArg::NumberArithmeticExpression(v) => v.unwrap_decimal(),
+                        DecimalComparatorArg::DecimalArithmeticExpression(v) => v.unwrap_decimal(),
+                    })
+                    .collect();
+                let result: Result<bool, CustomError> = evaluated_args
+                    .iter()
+                    .zip(&evaluated_args[1..])
+                    .fold(init, |acc, val| match &acc {
+                        Ok(true) => match val {
+                            (Ok(v1), Ok(v2)) => match operator {
+                                ComparatorOperator::Equals => Ok(v1 == v2),
+                                ComparatorOperator::GreaterThan => Ok(v1 < v2),
+                                ComparatorOperator::LessThan => Ok(v1 > v2),
+                                ComparatorOperator::GreaterThanEquals => Ok(v1 <= v2),
+                                ComparatorOperator::LessThanEquals => Ok(v1 >= v2),
+                            },
+                            (Ok(_), Err(e)) => Err(*e),
+                            (Err(e), Ok(_)) => Err(*e),
+                            (Err(e), Err(_)) => Err(*e),
+                        },
+                        _ => acc,
+                    });
+                match result {
+                    Ok(v) => match result_type {
+                        ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                        ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                    },
+                    Err(e) => Err(e),
+                }
+            }
+        }
+    }
+}
+
+// TEXT COMPARATOR
+
+#[derive(Debug)]
+enum TextComparatorArg {
+    Number(i32),
+    Decimal(BigDecimal),
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    DecimalArithmeticExpression(DecimalArithmeticExpression),
+    NumberComparatorExpression(NumberComparatorExpression),
+    DecimalComparatorExpression(DecimalComparatorExpression),
+    // Expression(ArithmeticControlFlowExpression),
+}
+
+#[derive(Debug)]
+enum TextComparatorExpression {
+    Equals(
+        Box<(
+            TextComparatorArg,
+            TextComparatorArg,
+            Vec<TextComparatorArg>,
+        )>,
+    ),
+    GreaterThan(
+        Box<(
+            TextComparatorArg,
+            TextComparatorArg,
+            Vec<TextComparatorArg>,
+        )>,
+    ),
+    LessThan(
+        Box<(
+            TextComparatorArg,
+            TextComparatorArg,
+            Vec<TextComparatorArg>,
+        )>,
+    ),
+    GreaterThanEquals(
+        Box<(
+            TextComparatorArg,
+            TextComparatorArg,
+            Vec<TextComparatorArg>,
+        )>,
+    ),
+    LessThanEquals(
+        Box<(
+            TextComparatorArg,
+            TextComparatorArg,
+            Vec<TextComparatorArg>,
+        )>,
+    ),
+}
+
+impl TextComparatorExpression {
+    fn unwrap_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn unwrap_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+
+    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+        let (args, operator) = match self {
+            TextComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
+            TextComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
+            TextComparatorExpression::LessThan(v) => (v, ComparatorOperator::LessThan),
+            TextComparatorExpression::GreaterThanEquals(v) => {
+                (v, ComparatorOperator::GreaterThanEquals)
+            }
+            TextComparatorExpression::LessThanEquals(v) => {
+                (v, ComparatorOperator::LessThanEquals)
+            }
+        };
+        let arg0: Result<String, CustomError> = match &args.0 {
+            TextComparatorArg::Number(v) => Ok(v.to_string()),
+            TextComparatorArg::Decimal(v) => Ok(v.to_string()),
+            TextComparatorArg::NumberArithmeticExpression(v) => v.unwrap_text(),
+            TextComparatorArg::DecimalArithmeticExpression(v) => v.unwrap_text(),
+            TextComparatorArg::NumberComparatorExpression(v) => v.unwrap_text(),
+            TextComparatorArg::DecimalComparatorExpression(v) => v.unwrap_text(),
+        };
+        let arg1: Result<String, CustomError> = match &args.1 {
+            TextComparatorArg::Number(v) => Ok(v.to_string()),
+            TextComparatorArg::Decimal(v) => Ok(v.to_string()),
+            TextComparatorArg::NumberArithmeticExpression(v) => v.unwrap_text(),
+            TextComparatorArg::DecimalArithmeticExpression(v) => v.unwrap_text(),
+            TextComparatorArg::NumberComparatorExpression(v) => v.unwrap_text(),
+            TextComparatorArg::DecimalComparatorExpression(v) => v.unwrap_text(),
+        };
+        let init: Result<bool, CustomError> = match (arg0, arg1) {
+            (Ok(v), Ok(v1)) => match operator {
+                ComparatorOperator::Equals => Ok(v == v1),
+                ComparatorOperator::GreaterThan => Ok(v < v1),
+                ComparatorOperator::LessThan => Ok(v > v1),
+                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                ComparatorOperator::LessThanEquals => Ok(v >= v1),
+            },
+            (Ok(_), Err(e)) => Err(e),
+            (Err(e), Ok(_)) => Err(e),
+            (Err(e), Err(_)) => Err(e),
+        };
+        match args.2.len() == 0 {
+            true => match init {
+                Ok(v) => match result_type {
+                    ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                    ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                },
+                Err(e) => Err(e),
+            },
+            false => {
+                let evaluated_args: Vec<Result<String, CustomError>> = std::iter::once(&args.1)
+                    .chain(&args.2)
+                    .map(|val| match val {
+                        TextComparatorArg::Number(v) => Ok(v.to_string()),
+                        TextComparatorArg::Decimal(v) => Ok(v.to_string()),
+                        TextComparatorArg::NumberArithmeticExpression(v) => v.unwrap_text(),
+                        TextComparatorArg::DecimalArithmeticExpression(v) => v.unwrap_text(),
+                        TextComparatorArg::NumberComparatorExpression(v) => v.unwrap_text(),
+                        TextComparatorArg::DecimalComparatorExpression(v) => v.unwrap_text(),
+                    })
+                    .collect();
+                let result: Result<bool, CustomError> = evaluated_args
+                    .iter()
+                    .zip(&evaluated_args[1..])
+                    .fold(init, |acc, val| match &acc {
+                        Ok(true) => match val {
+                            (Ok(v1), Ok(v2)) => match operator {
+                                ComparatorOperator::Equals => Ok(v1 == v2),
+                                ComparatorOperator::GreaterThan => Ok(v1 < v2),
+                                ComparatorOperator::LessThan => Ok(v1 > v2),
+                                ComparatorOperator::GreaterThanEquals => Ok(v1 <= v2),
+                                ComparatorOperator::LessThanEquals => Ok(v1 >= v2),
+                            },
+                            (Ok(_), Err(e)) => Err(*e),
+                            (Err(e), Ok(_)) => Err(*e),
+                            (Err(e), Err(_)) => Err(*e),
+                        },
+                        _ => acc,
+                    });
+                match result {
+                    Ok(v) => match result_type {
+                        ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                        ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                    },
+                    Err(e) => Err(e),
+                }
+            }
+        }
+    }
+}
+
+// LOGICAL OPS
 
 #[derive(Debug)]
 enum LogicalResultType {
@@ -90,579 +764,151 @@ enum LogicalResultType {
 }
 
 #[derive(Debug)]
-enum LogicalArgType {
-    Boolean,
-}
-
-#[derive(Debug)]
-enum LogicalArg {
-    Boolean(bool),
-    NumberComparatorExpression(NumberComparatorExpression),
-    DecimalComparatorExpression(DecimalComparatorExpression),
-    TextComparatorExpression(TextComparatorExpression),
-}
-
-#[derive(Debug)]
-enum LogicalOperatorBinary {
-    And,
-    Or,
-}
-
-#[derive(Debug)]
-enum LogicalOperatorUnary {
-    Not,
-}
-
-// Control Flow Ops
-
-// #[derive(Debug)]
-// enum ControlFlowResultType {
-//     Number,
-//     Decimal,
-//     Boolean,
-//     Text,
-// }
-
-// #[derive(Debug)]
-// enum ControlFlowArgType {
-//     Number,
-//     Decimal,
-//     Boolean,
-//     Text,
-// }
-
-// match expr {
-//  expr11: expr12
-//  expr21: expr22
-//  expr31: expr32
-//  expr4
-// }
-// #[derive(Debug)]
-// enum ControlFlowArg {
-//     Expression(
-//         LispExpression,
-//         Vec<(LispExpression, LispExpression)>,
-//         LispExpression,
-//     ),
-// }
-
-// #[derive(Debug)]
-// enum ControlFlowOperator {
-//     Match,
-// }
-
-#[derive(Debug)]
-enum NumberComparatorArg {
-    Number(i32),
-    ArithmeticExpression(ArithmeticExpression),
-}
-
-#[derive(Debug)]
-enum DecimalComparatorArg {
-    Decimal(BigDecimal),
-    ArithmeticExpression(ArithmeticExpression),
-}
-
-#[derive(Debug)]
-enum TextComparatorArg {
-    Text(String),
-    ArithmeticExpression(ArithmeticExpression),
-    NumberComparatorExpression(NumberComparatorExpression),
-    DecimalComparatorExpression(DecimalComparatorExpression),
-    TextComparatorExpression(TextComparatorExpression),
-    LogicalExpression(LogicalExpression),
-}
-
-#[derive(Debug)]
-enum ArithmeticExpression {
-    Add {
-        types: ArithmeticArgType,
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-    },
-    Multiply {
-        types: ArithmeticArgType,
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-    },
-    Subtract {
-        types: ArithmeticArgType,
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-    },
-    Divide {
-        types: ArithmeticArgType,
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-    },
-    Modulus {
-        types: ArithmeticArgType,
-        args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-    },
-}
-
-#[derive(Debug)]
-enum NumberComparatorExpression {
-    Equals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    GreaterThan {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    LessThan {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    GreaterThanEquals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    LessThanEquals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-}
-
-#[derive(Debug)]
-enum DecimalComparatorExpression {
-    Equals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    GreaterThan {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    LessThan {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    GreaterThanEquals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    LessThanEquals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-}
-
-#[derive(Debug)]
-enum TextComparatorExpression {
-    Equals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    GreaterThan {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    LessThan {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    GreaterThanEquals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-    LessThanEquals {
-        types: ComparatorArgType,
-        args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-    },
-}
-
-#[derive(Debug)]
-enum LogicalExpression {
-    And {
-        args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
-    },
-    Or {
-        args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
-    },
-    Not {
-        args: Box<LogicalArg>,
-    },
-}
-
-// #[derive(Debug)]
-// enum AnyExpression {
-//     ArithmeticExpression(ArithmeticExpression),
-//     ComparatorExpression(ComparatorExpression),
-//     LogicalExpression(LogicalExpression),
-//     // ControlFlowExpression(ControlFlowExpression),
-// }
-
-// Note. In some places, tuples or slices could be used here instead of arrays
-#[derive(Debug)]
-enum LispExpression {
-    // Add {
-//     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-//     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-// },
-// Multiply {
-//     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-//     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-// },
-// Subtract {
-//     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-//     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-// },
-// Divide {
-//     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-//     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-// },
-// Modulus {
-//     types: (ArithmeticArgType, Vec<ArithmeticArgType>),
-//     args: Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-// },
-// Equals {
-//     types: ComparatorArgType,
-//     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-// },
-// GreaterThan {
-//     types: ComparatorArgType,
-//     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-// },
-// LessThan {
-//     types: ComparatorArgType,
-//     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-// },
-// GreaterThanEquals {
-//     types: ComparatorArgType,
-//     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-// },
-// LessThanEquals {
-//     types: ComparatorArgType,
-//     args: Box<(ComparatorArg, ComparatorArg, Vec<ComparatorArg>)>,
-// },
-// And {
-//     args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
-// },
-// Or {
-//     args: Box<(LogicalArg, LogicalArg, Vec<LogicalArg>)>,
-// },
-// Not {
-//     args: Box<LogicalArg>,
-// },
-// Match {
-//     types: (ControlFlowArgType, ControlFlowArgType),
-//     args: Box<(
-//         LispExpression,
-//         Vec<(LispExpression, LispExpression)>,
-//         LispExpression,
-//     )>,
-// },
-}
-
-#[derive(Debug)]
-enum ArithmeticResult {
-    Number(i32),
-    Decimal(BigDecimal),
-    Text(String),
-}
-
-#[derive(Debug)]
-enum ComparatorResult {
-    Boolean(bool),
-    Text(String),
-}
-
-#[derive(Debug)]
 enum LogicalResult {
     Boolean(bool),
     Text(String),
 }
 
+// NUMBER COMPARATOR
+
 #[derive(Debug)]
-enum ControlFlowResult {
+enum LogicalOperator {
+    And,
+    Or
+}
+
+#[derive(Debug)]
+enum NumberComparatorArg {
+    // Note. Decimal is not allowed as an arg to avoid loss of precision
     Number(i32),
-    Decimal(BigDecimal),
-    Boolean(bool),
-    Text(String),
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    // Expression(ArithmeticControlFlowExpression),
 }
 
 #[derive(Debug)]
-enum LispExpressionResultType {
-    Number,
-    Decimal,
-    Boolean,
-    Text,
+enum NumberComparatorExpression {
+    Equals(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    GreaterThan(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    LessThan(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    GreaterThanEquals(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
+    LessThanEquals(
+        Box<(
+            NumberComparatorArg,
+            NumberComparatorArg,
+            Vec<NumberComparatorArg>,
+        )>,
+    ),
 }
 
-#[derive(Debug)]
-enum LispExpressionResult {
-    Number(i32),
-    Decimal(BigDecimal),
-    Boolean(bool),
-    Text(String),
-}
-
-impl ArithmeticExpression {
-    fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
-        match self {
-            ArithmeticExpression::Add { types, args } => todo!(),
-            ArithmeticExpression::Multiply { types, args } => todo!(),
-            ArithmeticExpression::Subtract { types, args } => todo!(),
-            ArithmeticExpression::Divide { types, args } => todo!(),
-            ArithmeticExpression::Modulus { types, args } => todo!(),
-        }
-        Ok(ArithmeticResult::Number(0))
-    }
-
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number)? {
-            ArithmeticResult::Number(v) => Ok(v),
+impl NumberComparatorExpression {
+    fn unwrap_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
 
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(ArithmeticResultType::Decimal)? {
-            ArithmeticResult::Decimal(v) => Ok(v),
+    fn unwrap_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
 
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ArithmeticResultType::Text)? {
-            ArithmeticResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    // Write test cases and build some audio visual documentation
-    fn arithmetic_op(
-        result_type: ArithmeticResultType,
-        types: &(ArithmeticArgType, Vec<ArithmeticArgType>),
-        args: &Box<(ArithmeticArg, Vec<ArithmeticArg>)>,
-        operator: ArithmeticOperator,
-    ) -> Result<ArithmeticResult, CustomError> {
-        let last_type = match types.1.is_empty() {
-            true => &types.0,
-            false => match types.1.last() {
-                Some(v) => v,
-                None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-            },
-        };
-        let contains_decimal_type: bool = match types.0 {
-            ArithmeticArgType::Decimal => true,
-            _ => types.1.iter().any(|val| match val {
-                ArithmeticArgType::Decimal => true,
-                _ => false,
-            }),
-        };
-        match contains_decimal_type {
-            true => {
-                let mut temp: BigDecimal = match BigDecimal::from_i32(1) {
-                    Some(v) => v,
-                    None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                };
-                let init: Result<BigDecimal, CustomError> = match &args.0 {
-                    ArithmeticArg::Number(v) => match BigDecimal::from_i32(*v) {
-                        Some(v1) => {
-                            temp *= v1;
-                            Ok(temp)
-                        }
-                        None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    ArithmeticArg::Decimal(v1) => {
-                        temp *= v1;
-                        Ok(temp)
-                    }
-                    ArithmeticArg::Expression(v1) => match LispExpression::get_decimal(&v1) {
-                        Ok(v2) => {
-                            temp *= v2;
-                            Ok(temp)
-                        }
-                        Err(e) => Err(e),
-                    },
-                };
-                let result: Result<BigDecimal, CustomError> = args
-                    .1
-                    .iter()
-                    .zip(types.1.iter().chain(repeat(last_type)))
-                    .fold(init, |acc, val| match &acc {
-                        Ok(v) => match val.1 {
-                            ArithmeticArgType::Number => match val.0 {
-                                ArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
-                                    Some(v1) => match operator {
-                                        ArithmeticOperator::Add => Ok(v + v1),
-                                        ArithmeticOperator::Multiply => Ok(v * v1),
-                                        ArithmeticOperator::Subtract => Ok(v - v1),
-                                        ArithmeticOperator::Divide => Ok(v / v1),
-                                        ArithmeticOperator::Modulus => Ok(v % v1),
-                                    },
-                                    None => {
-                                        return Err(CustomError::Message(
-                                            UNEXPECTED_ERROR.to_string(),
-                                        ))
-                                    }
-                                },
-                                ArithmeticArg::Decimal(v1) => match operator {
-                                    ArithmeticOperator::Add => Ok(v + v1),
-                                    ArithmeticOperator::Multiply => Ok(v * v1),
-                                    ArithmeticOperator::Subtract => Ok(v - v1),
-                                    ArithmeticOperator::Divide => Ok(v / v1),
-                                    ArithmeticOperator::Modulus => Ok(v % v1),
-                                },
-                                ArithmeticArg::Expression(v1) => {
-                                    match LispExpression::get_decimal(v1) {
-                                        Ok(v2) => match operator {
-                                            ArithmeticOperator::Add => Ok(v + v2),
-                                            ArithmeticOperator::Multiply => Ok(v * v2),
-                                            ArithmeticOperator::Subtract => Ok(v - v2),
-                                            ArithmeticOperator::Divide => Ok(v / v2),
-                                            ArithmeticOperator::Modulus => Ok(v % v2),
-                                        },
-                                        Err(e) => Err(e),
-                                    }
-                                }
-                            },
-                            ArithmeticArgType::Decimal => match val.0 {
-                                ArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
-                                    Some(v1) => match operator {
-                                        ArithmeticOperator::Add => Ok(v + v1),
-                                        ArithmeticOperator::Multiply => Ok(v * v1),
-                                        ArithmeticOperator::Subtract => Ok(v - v1),
-                                        ArithmeticOperator::Divide => Ok(v / v1),
-                                        ArithmeticOperator::Modulus => Ok(v % v1),
-                                    },
-                                    None => {
-                                        return Err(CustomError::Message(
-                                            UNEXPECTED_ERROR.to_string(),
-                                        ))
-                                    }
-                                },
-                                ArithmeticArg::Decimal(v1) => match operator {
-                                    ArithmeticOperator::Add => Ok(v + v1),
-                                    ArithmeticOperator::Multiply => Ok(v * v1),
-                                    ArithmeticOperator::Subtract => Ok(v - v1),
-                                    ArithmeticOperator::Divide => Ok(v / v1),
-                                    ArithmeticOperator::Modulus => Ok(v % v1),
-                                },
-                                ArithmeticArg::Expression(v1) => {
-                                    match LispExpression::get_decimal(v1) {
-                                        Ok(v2) => match operator {
-                                            ArithmeticOperator::Add => Ok(v + v2),
-                                            ArithmeticOperator::Multiply => Ok(v * v2),
-                                            ArithmeticOperator::Subtract => Ok(v - v2),
-                                            ArithmeticOperator::Divide => Ok(v / v2),
-                                            ArithmeticOperator::Modulus => Ok(v % v2),
-                                        },
-                                        Err(e) => Err(e),
-                                    }
-                                }
-                            },
-                        },
-                        Err(_) => acc,
-                    });
-                match result_type {
-                    ArithmeticResultType::Number => match result {
-                        Ok(v) => match v.to_i32() {
-                            Some(v1) => Ok(ArithmeticResult::Number(v1)),
-                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                        },
-                        Err(e) => Err(e),
-                    },
-                    ArithmeticResultType::Decimal => match result {
-                        Ok(v) => Ok(ArithmeticResult::Decimal(v)),
-                        Err(e) => Err(e),
-                    },
-                    ArithmeticResultType::Text => match result {
-                        Ok(v) => Ok(ArithmeticResult::Text(v.to_string())),
-                        Err(e) => Err(e),
-                    },
-                }
+    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+        let (args, operator) = match self {
+            NumberComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
+            NumberComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
+            NumberComparatorExpression::LessThan(v) => (v, ComparatorOperator::LessThan),
+            NumberComparatorExpression::GreaterThanEquals(v) => {
+                (v, ComparatorOperator::GreaterThanEquals)
             }
+            NumberComparatorExpression::LessThanEquals(v) => {
+                (v, ComparatorOperator::LessThanEquals)
+            }
+        };
+        let arg0: Result<i32, CustomError> = match &args.0 {
+            NumberComparatorArg::Number(v) => Ok(*v),
+            NumberComparatorArg::NumberArithmeticExpression(v) => v.unwrap_number(),
+        };
+        let arg1: Result<i32, CustomError> = match &args.1 {
+            NumberComparatorArg::Number(v) => Ok(*v),
+            NumberComparatorArg::NumberArithmeticExpression(v) => v.unwrap_number(),
+        };
+        let init: Result<bool, CustomError> = match (arg0, arg1) {
+            (Ok(v), Ok(v1)) => match operator {
+                ComparatorOperator::Equals => Ok(v == v1),
+                ComparatorOperator::GreaterThan => Ok(v < v1),
+                ComparatorOperator::LessThan => Ok(v > v1),
+                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                ComparatorOperator::LessThanEquals => Ok(v >= v1),
+            },
+            (Ok(_), Err(e)) => Err(e),
+            (Err(e), Ok(_)) => Err(e),
+            (Err(e), Err(_)) => Err(e),
+        };
+        match args.2.len() == 0 {
+            true => match init {
+                Ok(v) => match result_type {
+                    ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                    ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
+                },
+                Err(e) => Err(e),
+            },
             false => {
-                let init: Result<i32, CustomError> = match &args.0 {
-                    ArithmeticArg::Number(v) => Ok(*v),
-                    ArithmeticArg::Decimal(v) => match v.to_i32() {
-                        Some(v1) => Ok(v1),
-                        None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    ArithmeticArg::Expression(v1) => match LispExpression::get_number(v1) {
-                        Ok(v2) => Ok(v2),
-                        Err(e) => Err(e),
-                    },
-                };
-                let result: Result<i32, CustomError> = args
-                    .1
+                let evaluated_args: Vec<Result<i32, CustomError>> = std::iter::once(&args.1)
+                    .chain(&args.2)
+                    .map(|val| match val {
+                        NumberComparatorArg::Number(v) => Ok(*v),
+                        NumberComparatorArg::NumberArithmeticExpression(v) => v.unwrap_number(),
+                    })
+                    .collect();
+                let result: Result<bool, CustomError> = evaluated_args
                     .iter()
-                    .zip(types.1.iter().chain(repeat(last_type)))
+                    .zip(&evaluated_args[1..])
                     .fold(init, |acc, val| match &acc {
-                        Ok(v) => match val.1 {
-                            ArithmeticArgType::Number => match val.0 {
-                                ArithmeticArg::Number(v1) => match operator {
-                                    ArithmeticOperator::Add => Ok(v + *v1),
-                                    ArithmeticOperator::Multiply => Ok(v * *v1),
-                                    ArithmeticOperator::Subtract => Ok(v - *v1),
-                                    ArithmeticOperator::Divide => Ok(v / *v1),
-                                    ArithmeticOperator::Modulus => Ok(v % *v1),
-                                },
-                                ArithmeticArg::Decimal(v1) => match v1.to_i32() {
-                                    Some(v2) => match operator {
-                                        ArithmeticOperator::Add => Ok(v + v2),
-                                        ArithmeticOperator::Multiply => Ok(v * v2),
-                                        ArithmeticOperator::Subtract => Ok(v - v2),
-                                        ArithmeticOperator::Divide => Ok(v / v2),
-                                        ArithmeticOperator::Modulus => Ok(v % v2),
-                                    },
-                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                                },
-                                ArithmeticArg::Expression(v1) => {
-                                    match LispExpression::get_number(v1) {
-                                        Ok(v2) => match operator {
-                                            ArithmeticOperator::Add => Ok(v + v2),
-                                            ArithmeticOperator::Multiply => Ok(v * v2),
-                                            ArithmeticOperator::Subtract => Ok(v - v2),
-                                            ArithmeticOperator::Divide => Ok(v / v2),
-                                            ArithmeticOperator::Modulus => Ok(v % v2),
-                                        },
-                                        Err(e) => Err(e),
-                                    }
-                                }
+                        Ok(true) => match val {
+                            (Ok(v1), Ok(v2)) => match operator {
+                                ComparatorOperator::Equals => Ok(v1 == v2),
+                                ComparatorOperator::GreaterThan => Ok(v1 < v2),
+                                ComparatorOperator::LessThan => Ok(v1 > v2),
+                                ComparatorOperator::GreaterThanEquals => Ok(v1 <= v2),
+                                ComparatorOperator::LessThanEquals => Ok(v1 >= v2),
                             },
-                            ArithmeticArgType::Decimal => match val.0 {
-                                ArithmeticArg::Number(v1) => match operator {
-                                    ArithmeticOperator::Add => Ok(v + *v1),
-                                    ArithmeticOperator::Multiply => Ok(v * *v1),
-                                    ArithmeticOperator::Subtract => Ok(v - *v1),
-                                    ArithmeticOperator::Divide => Ok(v / *v1),
-                                    ArithmeticOperator::Modulus => Ok(v % *v1),
-                                },
-                                ArithmeticArg::Decimal(v1) => match v1.to_i32() {
-                                    Some(v2) => match operator {
-                                        ArithmeticOperator::Add => Ok(v + v2),
-                                        ArithmeticOperator::Multiply => Ok(v * v2),
-                                        ArithmeticOperator::Subtract => Ok(v - v2),
-                                        ArithmeticOperator::Divide => Ok(v / v2),
-                                        ArithmeticOperator::Modulus => Ok(v % v2),
-                                    },
-                                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                                },
-                                ArithmeticArg::Expression(v1) => {
-                                    match LispExpression::get_number(v1) {
-                                        Ok(v2) => match operator {
-                                            ArithmeticOperator::Add => Ok(v + v2),
-                                            ArithmeticOperator::Multiply => Ok(v * v2),
-                                            ArithmeticOperator::Subtract => Ok(v - v2),
-                                            ArithmeticOperator::Divide => Ok(v / v2),
-                                            ArithmeticOperator::Modulus => Ok(v % v2),
-                                        },
-                                        Err(e) => Err(e),
-                                    }
-                                }
-                            },
+                            (Ok(_), Err(e)) => Err(*e),
+                            (Err(e), Ok(_)) => Err(*e),
+                            (Err(e), Err(_)) => Err(*e),
                         },
-                        Err(_) => acc,
+                        _ => acc,
                     });
                 match result {
                     Ok(v) => match result_type {
-                        ArithmeticResultType::Number => Ok(ArithmeticResult::Number(v)),
-                        ArithmeticResultType::Decimal => match BigDecimal::from_i32(v) {
-                            Some(v1) => Ok(ArithmeticResult::Decimal(v1)),
-                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                        },
-                        ArithmeticResultType::Text => Ok(ArithmeticResult::Text(v.to_string())),
+                        ComparatorResultType::Boolean => Ok(ComparatorResult::Boolean(v)),
+                        ComparatorResultType::Text => Ok(ComparatorResult::Text(v.to_string())),
                     },
                     Err(e) => Err(e),
                 }
