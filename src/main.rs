@@ -8,6 +8,7 @@ use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
 use std::collections::HashMap;
 use std::str::FromStr;
+use std::vec;
 
 const UNEXPECTED_ERROR: &str = "Unexpected Error";
 
@@ -35,6 +36,21 @@ impl Debug for dyn ToNumber {
     }
 }
 
+impl ToNumber for i32 {
+    fn get_number(&self) -> Result<i32, CustomError> {
+        Ok(*self)
+    }
+}
+
+impl ToNumber for BigDecimal {
+    fn get_number(&self) -> Result<i32, CustomError> {
+        match self.to_i32() {
+            Some(v) => Ok(v),
+            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+        }
+    }
+}
+
 trait ToDecimal {
     fn get_decimal(&self) -> Result<BigDecimal, CustomError>;
 }
@@ -42,6 +58,21 @@ trait ToDecimal {
 impl Debug for dyn ToDecimal {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self.get_decimal())
+    }
+}
+
+impl ToDecimal for i32 {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match BigDecimal::from_i32(*self) {
+            Some(v) => Ok(v),
+            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+        }
+    }
+}
+
+impl ToDecimal for BigDecimal {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+        Ok(self.clone())
     }
 }
 
@@ -55,6 +86,30 @@ impl Debug for dyn ToText {
     }
 }
 
+impl ToText for i32 {
+    fn get_text(&self) -> Result<String, CustomError> {
+        Ok(self.to_string())
+    }
+}
+
+impl ToText for BigDecimal {
+    fn get_text(&self) -> Result<String, CustomError> {
+        Ok(self.to_string())
+    }
+}
+
+impl ToText for String {
+    fn get_text(&self) -> Result<String, CustomError> {
+        Ok(self.to_string())
+    }
+}
+
+impl ToText for bool {
+    fn get_text(&self) -> Result<String, CustomError> {
+        Ok(self.to_string())
+    }
+}
+
 trait ToBoolean {
     fn get_boolean(&self) -> Result<bool, CustomError>;
 }
@@ -62,6 +117,12 @@ trait ToBoolean {
 impl Debug for dyn ToBoolean {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:?}", self.get_boolean())
+    }
+}
+
+impl ToBoolean for bool {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        Ok(*self)
     }
 }
 
@@ -93,18 +154,12 @@ enum ArithmeticOperator {
 // NUMBER ARITHMETIC
 
 #[derive(Debug)]
-enum NumberArithmeticArg {
-    Number(i32),
-    Expression(Box<dyn ToNumber>),
-}
-
-#[derive(Debug)]
 enum NumberArithmeticExpression {
-    Add((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
-    Multiply((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
-    Subtract((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
-    Divide((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
-    Modulus((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
+    Add((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    Multiply((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    Subtract((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    Divide((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    Modulus((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
 }
 
 impl NumberArithmeticExpression {
@@ -116,29 +171,17 @@ impl NumberArithmeticExpression {
             NumberArithmeticExpression::Divide(v) => (v, ArithmeticOperator::Divide),
             NumberArithmeticExpression::Modulus(v) => (v, ArithmeticOperator::Modulus),
         };
-        let init: Result<i32, CustomError> = match &args.0 {
-            NumberArithmeticArg::Number(v) => Ok(*v),
-            NumberArithmeticArg::Expression(v) => v.get_number(),
-        };
+        let init: Result<i32, CustomError> = args.0.get_number();
         let result: Result<i32, CustomError> = args.1.iter().fold(init, |acc, val| match &acc {
-            Ok(v) => match val {
-                NumberArithmeticArg::Number(v1) => match operator {
-                    ArithmeticOperator::Add => Ok(v + *v1),
-                    ArithmeticOperator::Multiply => Ok(v * *v1),
-                    ArithmeticOperator::Subtract => Ok(v - *v1),
-                    ArithmeticOperator::Divide => Ok(v / *v1),
-                    ArithmeticOperator::Modulus => Ok(v % *v1),
+            Ok(v) => match val.get_number() {
+                Ok(v1) => match operator {
+                    ArithmeticOperator::Add => Ok(v + v1),
+                    ArithmeticOperator::Multiply => Ok(v * v1),
+                    ArithmeticOperator::Subtract => Ok(v - v1),
+                    ArithmeticOperator::Divide => Ok(v / v1),
+                    ArithmeticOperator::Modulus => Ok(v % v1),
                 },
-                NumberArithmeticArg::Expression(v1) => match v1.get_number() {
-                    Ok(v2) => match operator {
-                        ArithmeticOperator::Add => Ok(v + v2),
-                        ArithmeticOperator::Multiply => Ok(v * v2),
-                        ArithmeticOperator::Subtract => Ok(v - v2),
-                        ArithmeticOperator::Divide => Ok(v / v2),
-                        ArithmeticOperator::Modulus => Ok(v % v2),
-                    },
-                    Err(e) => Err(e),
-                },
+                Err(e) => Err(e),
             },
             Err(_) => acc,
         });
@@ -186,19 +229,12 @@ impl ToText for NumberArithmeticExpression {
 // DECIMAL ARITHMETIC
 
 #[derive(Debug)]
-enum DecimalArithmeticArg {
-    Number(i32),
-    Decimal(BigDecimal),
-    Expression(Box<dyn ToDecimal>),
-}
-
-#[derive(Debug)]
 enum DecimalArithmeticExpression {
-    Add((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
-    Multiply((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
-    Subtract((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
-    Divide((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
-    Modulus((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
+    Add((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
+    Multiply((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
+    Subtract((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
+    Divide((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
+    Modulus((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
 }
 
 impl DecimalArithmeticExpression {
@@ -214,50 +250,18 @@ impl DecimalArithmeticExpression {
             Some(v) => v,
             None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
         };
-        let init: Result<BigDecimal, CustomError> = match &args.0 {
-            DecimalArithmeticArg::Number(v) => match BigDecimal::from_i32(*v) {
-                Some(v1) => {
-                    temp *= v1;
-                    Ok(temp)
-                }
-                None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-            },
-            DecimalArithmeticArg::Decimal(v1) => {
-                temp *= v1;
-                Ok(temp)
-            }
-            DecimalArithmeticArg::Expression(v) => v.get_decimal(),
-        };
+        let init: Result<BigDecimal, CustomError> = args.0.get_decimal();
         let result: Result<BigDecimal, CustomError> =
             args.1.iter().fold(init, |acc, val| match &acc {
-                Ok(v) => match val {
-                    DecimalArithmeticArg::Number(v1) => match BigDecimal::from_i32(*v1) {
-                        Some(v1) => match operator {
-                            ArithmeticOperator::Add => Ok(v + v1),
-                            ArithmeticOperator::Multiply => Ok(v * v1),
-                            ArithmeticOperator::Subtract => Ok(v - v1),
-                            ArithmeticOperator::Divide => Ok(v / v1),
-                            ArithmeticOperator::Modulus => Ok(v % v1),
-                        },
-                        None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                    },
-                    DecimalArithmeticArg::Decimal(v1) => match operator {
+                Ok(v) => match val.get_decimal() {
+                    Ok(v1) => match operator {
                         ArithmeticOperator::Add => Ok(v + v1),
                         ArithmeticOperator::Multiply => Ok(v * v1),
                         ArithmeticOperator::Subtract => Ok(v - v1),
                         ArithmeticOperator::Divide => Ok(v / v1),
                         ArithmeticOperator::Modulus => Ok(v % v1),
                     },
-                    DecimalArithmeticArg::Expression(v1) => match v1.get_decimal() {
-                        Ok(v2) => match operator {
-                            ArithmeticOperator::Add => Ok(v + v2),
-                            ArithmeticOperator::Multiply => Ok(v * v2),
-                            ArithmeticOperator::Subtract => Ok(v - v2),
-                            ArithmeticOperator::Divide => Ok(v / v2),
-                            ArithmeticOperator::Modulus => Ok(v % v2),
-                        },
-                        Err(e) => Err(e),
-                    },
+                    Err(e) => Err(e),
                 },
                 Err(_) => acc,
             });
@@ -334,48 +338,12 @@ enum ComparatorOperator {
 // NUMBER COMPARATOR
 
 #[derive(Debug)]
-enum NumberComparatorArg {
-    Number(i32),
-    Expression(Box<dyn ToNumber>),
-}
-
-#[derive(Debug)]
 enum NumberComparatorExpression {
-    Equals(
-        (
-            NumberComparatorArg,
-            NumberComparatorArg,
-            Vec<NumberComparatorArg>,
-        ),
-    ),
-    GreaterThan(
-        (
-            NumberComparatorArg,
-            NumberComparatorArg,
-            Vec<NumberComparatorArg>,
-        ),
-    ),
-    LessThan(
-        (
-            NumberComparatorArg,
-            NumberComparatorArg,
-            Vec<NumberComparatorArg>,
-        ),
-    ),
-    GreaterThanEquals(
-        (
-            NumberComparatorArg,
-            NumberComparatorArg,
-            Vec<NumberComparatorArg>,
-        ),
-    ),
-    LessThanEquals(
-        (
-            NumberComparatorArg,
-            NumberComparatorArg,
-            Vec<NumberComparatorArg>,
-        ),
-    ),
+    Equals((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    GreaterThan((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    LessThan((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    GreaterThanEquals((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    LessThanEquals((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
 }
 
 impl NumberComparatorExpression {
@@ -391,15 +359,7 @@ impl NumberComparatorExpression {
                 (v, ComparatorOperator::LessThanEquals)
             }
         };
-        let arg0: Result<i32, CustomError> = match &args.0 {
-            NumberComparatorArg::Number(v) => Ok(*v),
-            NumberComparatorArg::Expression(v) => v.get_number(),
-        };
-        let arg1: Result<i32, CustomError> = match &args.1 {
-            NumberComparatorArg::Number(v) => Ok(*v),
-            NumberComparatorArg::Expression(v) => v.get_number(),
-        };
-        let init: Result<bool, CustomError> = match (arg0, arg1) {
+        let init: Result<bool, CustomError> = match (args.0.get_number(), args.1.get_number()) {
             (Ok(v), Ok(v1)) => match operator {
                 ComparatorOperator::Equals => Ok(v == v1),
                 ComparatorOperator::GreaterThan => Ok(v < v1),
@@ -422,10 +382,7 @@ impl NumberComparatorExpression {
             false => {
                 let evaluated_args: Vec<Result<i32, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| match val {
-                        NumberComparatorArg::Number(v) => Ok(*v),
-                        NumberComparatorArg::Expression(v) => v.get_number(),
-                    })
+                    .map(|val| val.get_number())
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
                     .iter()
@@ -478,47 +435,40 @@ impl ToBoolean for NumberComparatorExpression {
 // DECIMAL COMPARATOR
 
 #[derive(Debug)]
-enum DecimalComparatorArg {
-    Number(i32),
-    Decimal(BigDecimal),
-    Expression(Box<dyn ToDecimal>),
-}
-
-#[derive(Debug)]
 enum DecimalComparatorExpression {
     Equals(
         (
-            DecimalComparatorArg,
-            DecimalComparatorArg,
-            Vec<DecimalComparatorArg>,
+            Box<dyn ToDecimal>,
+            Box<dyn ToDecimal>,
+            Vec<Box<dyn ToDecimal>>,
         ),
     ),
     GreaterThan(
         (
-            DecimalComparatorArg,
-            DecimalComparatorArg,
-            Vec<DecimalComparatorArg>,
+            Box<dyn ToDecimal>,
+            Box<dyn ToDecimal>,
+            Vec<Box<dyn ToDecimal>>,
         ),
     ),
     LessThan(
         (
-            DecimalComparatorArg,
-            DecimalComparatorArg,
-            Vec<DecimalComparatorArg>,
+            Box<dyn ToDecimal>,
+            Box<dyn ToDecimal>,
+            Vec<Box<dyn ToDecimal>>,
         ),
     ),
     GreaterThanEquals(
         (
-            DecimalComparatorArg,
-            DecimalComparatorArg,
-            Vec<DecimalComparatorArg>,
+            Box<dyn ToDecimal>,
+            Box<dyn ToDecimal>,
+            Vec<Box<dyn ToDecimal>>,
         ),
     ),
     LessThanEquals(
         (
-            DecimalComparatorArg,
-            DecimalComparatorArg,
-            Vec<DecimalComparatorArg>,
+            Box<dyn ToDecimal>,
+            Box<dyn ToDecimal>,
+            Vec<Box<dyn ToDecimal>>,
         ),
     ),
 }
@@ -536,23 +486,7 @@ impl DecimalComparatorExpression {
                 (v, ComparatorOperator::LessThanEquals)
             }
         };
-        let arg0: Result<BigDecimal, CustomError> = match &args.0 {
-            DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
-                Some(v1) => Ok(v1),
-                None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-            },
-            DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
-            DecimalComparatorArg::Expression(v) => v.get_decimal(),
-        };
-        let arg1: Result<BigDecimal, CustomError> = match &args.1 {
-            DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
-                Some(v1) => Ok(v1),
-                None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-            },
-            DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
-            DecimalComparatorArg::Expression(v) => v.get_decimal(),
-        };
-        let init: Result<bool, CustomError> = match (arg0, arg1) {
+        let init: Result<bool, CustomError> = match (args.0.get_decimal(), args.1.get_decimal()) {
             (Ok(v), Ok(v1)) => match operator {
                 ComparatorOperator::Equals => Ok(v == v1),
                 ComparatorOperator::GreaterThan => Ok(v < v1),
@@ -575,14 +509,7 @@ impl DecimalComparatorExpression {
             false => {
                 let evaluated_args: Vec<Result<BigDecimal, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| match val {
-                        DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
-                            Some(v1) => Ok(v1),
-                            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-                        },
-                        DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
-                        DecimalComparatorArg::Expression(v) => v.get_decimal(),
-                    })
+                    .map(|val| val.get_decimal())
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
                     .iter()
@@ -635,19 +562,12 @@ impl ToBoolean for DecimalComparatorExpression {
 // TEXT COMPARATOR
 
 #[derive(Debug)]
-enum TextComparatorArg {
-    Number(i32),
-    Decimal(BigDecimal),
-    Expression(Box<dyn ToText>),
-}
-
-#[derive(Debug)]
 enum TextComparatorExpression {
-    Equals((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
-    GreaterThan((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
-    LessThan((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
-    GreaterThanEquals((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
-    LessThanEquals((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
+    Equals((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
+    GreaterThan((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
+    LessThan((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
+    GreaterThanEquals((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
+    LessThanEquals((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
 }
 
 impl TextComparatorExpression {
@@ -661,17 +581,7 @@ impl TextComparatorExpression {
             }
             TextComparatorExpression::LessThanEquals(v) => (v, ComparatorOperator::LessThanEquals),
         };
-        let arg0: Result<String, CustomError> = match &args.0 {
-            TextComparatorArg::Number(v) => Ok(v.to_string()),
-            TextComparatorArg::Decimal(v) => Ok(v.to_string()),
-            TextComparatorArg::Expression(v) => v.get_text(),
-        };
-        let arg1: Result<String, CustomError> = match &args.1 {
-            TextComparatorArg::Number(v) => Ok(v.to_string()),
-            TextComparatorArg::Decimal(v) => Ok(v.to_string()),
-            TextComparatorArg::Expression(v) => v.get_text(),
-        };
-        let init: Result<bool, CustomError> = match (arg0, arg1) {
+        let init: Result<bool, CustomError> = match (args.0.get_text(), args.1.get_text()) {
             (Ok(v), Ok(v1)) => match operator {
                 ComparatorOperator::Equals => Ok(v == v1),
                 ComparatorOperator::GreaterThan => Ok(v < v1),
@@ -694,11 +604,7 @@ impl TextComparatorExpression {
             false => {
                 let evaluated_args: Vec<Result<String, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| match val {
-                        TextComparatorArg::Number(v) => Ok(v.to_string()),
-                        TextComparatorArg::Decimal(v) => Ok(v.to_string()),
-                        TextComparatorArg::Expression(v) => v.get_text(),
-                    })
+                    .map(|val| val.get_text())
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
                     .iter()
@@ -762,12 +668,6 @@ enum LogicalResult {
     Text(String),
 }
 
-#[derive(Debug)]
-enum LogicalOperatorArg {
-    Boolean(bool),
-    Expression(Box<dyn ToBoolean>),
-}
-
 // BINARY LOGICAL
 
 #[derive(Debug)]
@@ -780,16 +680,16 @@ enum LogicalBinaryOperator {
 enum LogicalBinaryExpression {
     And(
         (
-            LogicalOperatorArg,
-            LogicalOperatorArg,
-            Vec<LogicalOperatorArg>,
+            Box<dyn ToBoolean>,
+            Box<dyn ToBoolean>,
+            Vec<Box<dyn ToBoolean>>,
         ),
     ),
     Or(
         (
-            LogicalOperatorArg,
-            LogicalOperatorArg,
-            Vec<LogicalOperatorArg>,
+            Box<dyn ToBoolean>,
+            Box<dyn ToBoolean>,
+            Vec<Box<dyn ToBoolean>>,
         ),
     ),
 }
@@ -800,15 +700,7 @@ impl LogicalBinaryExpression {
             LogicalBinaryExpression::And(v) => (v, LogicalBinaryOperator::And),
             LogicalBinaryExpression::Or(v) => (v, LogicalBinaryOperator::Or),
         };
-        let arg0: Result<bool, CustomError> = match &args.0 {
-            LogicalOperatorArg::Boolean(v) => Ok(*v),
-            LogicalOperatorArg::Expression(v) => v.get_boolean(),
-        };
-        let arg1: Result<bool, CustomError> = match &args.1 {
-            LogicalOperatorArg::Boolean(v) => Ok(*v),
-            LogicalOperatorArg::Expression(v) => v.get_boolean(),
-        };
-        let init: Result<bool, CustomError> = match (arg0, arg1) {
+        let init: Result<bool, CustomError> = match (args.0.get_boolean(), args.1.get_boolean()) {
             (Ok(v), Ok(v1)) => match operator {
                 LogicalBinaryOperator::And => Ok(v && v1),
                 LogicalBinaryOperator::Or => Ok(v || v1),
@@ -828,10 +720,7 @@ impl LogicalBinaryExpression {
             false => {
                 let evaluated_args: Vec<Result<bool, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| match val {
-                        LogicalOperatorArg::Boolean(v) => Ok(*v),
-                        LogicalOperatorArg::Expression(v) => v.get_boolean(),
-                    })
+                    .map(|val| val.get_boolean())
                     .collect();
                 let result: Result<bool, CustomError> =
                     evaluated_args.iter().fold(init, |acc, val| match &acc {
@@ -883,7 +772,7 @@ enum LogicalUnaryOperator {
 
 #[derive(Debug)]
 enum LogicalUnaryExpression {
-    Not(LogicalOperatorArg),
+    Not(Box<dyn ToBoolean>),
 }
 
 impl LogicalUnaryExpression {
@@ -891,9 +780,9 @@ impl LogicalUnaryExpression {
         let (args, _operator) = match self {
             LogicalUnaryExpression::Not(v) => (v, LogicalUnaryOperator::Not),
         };
-        let result: Result<bool, CustomError> = match args {
-            LogicalOperatorArg::Boolean(v) => Ok(*v),
-            LogicalOperatorArg::Expression(v) => v.get_boolean(),
+        let result: Result<bool, CustomError> = match args.get_boolean() {
+            Ok(v) => Ok(!v),
+            Err(e) => Err(e),
         };
         match result {
             Ok(v) => match result_type {
@@ -923,687 +812,571 @@ impl ToBoolean for LogicalUnaryExpression {
     }
 }
 
-// MATCH
-// Write a generic data structure to get what is required
-// Other expressions are based on what types of args they can take
-// There should also be 4 match expressions; for number, decimal, text, boolean
+// NUMBER MATCH
 
 #[derive(Debug)]
-enum LispExpression {
-    NumberArithmeticExpression(NumberArithmeticExpression),
-    DecimalArithmeticExpression(DecimalArithmeticExpression),
-    NumberComparatorExpression(NumberComparatorExpression),
-    DecimalComparatorExpression(DecimalComparatorExpression),
-    TextComparatorExpression(TextComparatorExpression),
-    LogicalBinaryExpression(LogicalBinaryExpression),
-    LogicalUnaryExpression(LogicalUnaryExpression),
+enum NumberMatchResultType {
+    Number,
+    Decimal,
+    Text,
 }
 
-// impl LispExpression {
-// fn eval(
-//     result_type: LispExpressionResultType,
-//     expr: &LispExpression,
-// ) -> Result<LispExpressionResult, CustomError> {
-// match expr {
-//         // LispExpression::Match { types, args } => {
-//         //     match Self::control_flow_op(
-//         //         match result_type {
-//         //             LispExpressionResultType::Number => ControlFlowResultType::Number,
-//         //             LispExpressionResultType::Decimal => ControlFlowResultType::Decimal,
-//         //             LispExpressionResultType::Boolean => ControlFlowResultType::Boolean,
-//         //             LispExpressionResultType::Text => ControlFlowResultType::Text,
-//         //         },
-//         //         types,
-//         //         args,
-//         //     ) {
-//         //         Ok(v) => match v {
-//         //             ControlFlowResult::Number(v1) => Ok(LispExpressionResult::Number(v1)),
-//         //             ControlFlowResult::Decimal(v1) => Ok(LispExpressionResult::Decimal(v1)),
-//         //             ControlFlowResult::Boolean(v1) => Ok(LispExpressionResult::Boolean(v1)),
-//         //             ControlFlowResult::Text(v1) => Ok(LispExpressionResult::Text(v1)),
-//         //         },
-//         //         Err(e) => Err(e),
-//         //     }
-//         // }
-//     }
-// }
+#[derive(Debug)]
+enum NumberMatchResult {
+    Number(i32),
+    Decimal(BigDecimal),
+    Text(String),
+}
 
-// fn get_result_type(arg_type: &ControlFlowArgType) -> LispExpressionResultType {
-//     match arg_type {
-//         ControlFlowArgType::Number => LispExpressionResultType::Number,
-//         ControlFlowArgType::Decimal => LispExpressionResultType::Decimal,
-//         ControlFlowArgType::Boolean => LispExpressionResultType::Boolean,
-//         ControlFlowArgType::Text => LispExpressionResultType::Text,
-//     }
-// }
+enum NumberMatchExpression {
+    NumberConditionExpression(
+        (
+            Box<dyn ToNumber>,
+            Vec<(Box<dyn ToNumber>, Box<dyn ToNumber>)>,
+            Box<dyn ToNumber>,
+        ),
+    ),
+    DecimalConditionExpression(
+        (
+            Box<dyn ToDecimal>,
+            Vec<(Box<dyn ToDecimal>, Box<dyn ToNumber>)>,
+            Box<dyn ToNumber>,
+        ),
+    ),
+    TextConditionExpression(
+        (
+            Box<dyn ToText>,
+            Vec<(Box<dyn ToText>, Box<dyn ToNumber>)>,
+            Box<dyn ToNumber>,
+        ),
+    ),
+    BooleanConditionExpression(
+        (
+            Box<dyn ToBoolean>,
+            Vec<(Box<dyn ToBoolean>, Box<dyn ToNumber>)>,
+            Box<dyn ToNumber>,
+        ),
+    ),
+}
 
-// fn control_flow_op(
-//     result_type: ControlFlowResultType,
-//     types: &(ControlFlowArgType, ControlFlowArgType),
-//     args: &Box<(
-//         LispExpression,
-//         Vec<(LispExpression, LispExpression)>,
-//         LispExpression,
-//     )>,
-// ) -> Result<ControlFlowResult, CustomError> {
-//     match args.1.is_empty() {
-//         true => match LispExpression::get_result_type(&types.1) {
-//             LispExpressionResultType::Number => match LispExpression::get_number(&args.2) {
-//                 Ok(v1) => match result_type {
-//                     ControlFlowResultType::Number => Ok(ControlFlowResult::Number(v1)),
-//                     ControlFlowResultType::Decimal => match BigDecimal::from_i32(v1) {
-//                         Some(v2) => Ok(ControlFlowResult::Decimal(v2)),
-//                         None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                     },
-//                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
-//                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//             LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.2) {
-//                 Ok(v1) => match result_type {
-//                     ControlFlowResultType::Number => match v1.to_i32() {
-//                         Some(v2) => Ok(ControlFlowResult::Number(v2)),
-//                         None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                     },
-//                     ControlFlowResultType::Decimal => Ok(ControlFlowResult::Decimal(v1)),
-//                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
-//                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//             LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.2) {
-//                 Ok(v1) => match result_type {
-//                     ControlFlowResultType::Boolean => Ok(ControlFlowResult::Boolean(v1)),
-//                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1.to_string())),
-//                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//             LispExpressionResultType::Text => match LispExpression::get_text(&args.2) {
-//                 Ok(v1) => match result_type {
-//                     ControlFlowResultType::Text => Ok(ControlFlowResult::Text(v1)),
-//                     _ => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//         },
-//         false => match LispExpression::get_result_type(&types.0) {
-//             LispExpressionResultType::Number => match LispExpression::get_number(&args.0) {
-//                 Ok(v) => match LispExpression::get_result_type(&types.1) {
-//                     LispExpressionResultType::Number => {
-//                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-//                         let result: Result<(bool, i32), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_number(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_number(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Number(v1.1)),
-//                                 false => match LispExpression::get_number(&args.2) {
-//                                     Ok(v1) => match result_type {
-//                                         ControlFlowResultType::Number => {
-//                                             Ok(ControlFlowResult::Number(v1))
-//                                         }
-//                                         ControlFlowResultType::Decimal => {
-//                                             match BigDecimal::from_i32(v1) {
-//                                                 Some(v2) => Ok(ControlFlowResult::Decimal(v2)),
-//                                                 None => Err(CustomError::Message(
-//                                                     UNEXPECTED_ERROR.to_string(),
-//                                                 )),
-//                                             }
-//                                         }
-//                                         ControlFlowResultType::Text => {
-//                                             Ok(ControlFlowResult::Text(v1.to_string()))
-//                                         }
-//                                         _ => Err(CustomError::Message(
-//                                             UNEXPECTED_ERROR.to_string(),
-//                                         )),
-//                                     },
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Decimal => {
-//                         let init: Result<(bool, BigDecimal), CustomError> =
-//                             match BigDecimal::from_i32(0) {
-//                                 Some(v1) => Ok((false, v1)),
-//                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                             };
-//                         let result: Result<(bool, BigDecimal), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_number(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_decimal(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
-//                                 false => match LispExpression::get_decimal(&args.2) {
-//                                     Ok(v1) => match result_type {
-//                                         ControlFlowResultType::Number => match v1.to_i32() {
-//                                             Some(v2) => Ok(ControlFlowResult::Number(v2)),
-//                                             None => Err(CustomError::Message(
-//                                                 UNEXPECTED_ERROR.to_string(),
-//                                             )),
-//                                         },
-//                                         ControlFlowResultType::Decimal => {
-//                                             Ok(ControlFlowResult::Decimal(v1))
-//                                         }
-//                                         ControlFlowResultType::Text => {
-//                                             Ok(ControlFlowResult::Text(v1.to_string()))
-//                                         }
-//                                         _ => Err(CustomError::Message(
-//                                             UNEXPECTED_ERROR.to_string(),
-//                                         )),
-//                                     },
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Boolean => {
-//                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
-//                         let result: Result<(bool, bool), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_number(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_boolean(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
-//                                 false => match LispExpression::get_boolean(&args.2) {
-//                                     Ok(v1) => match result_type {
-//                                         ControlFlowResultType::Boolean => {
-//                                             Ok(ControlFlowResult::Boolean(v1))
-//                                         }
-//                                         ControlFlowResultType::Text => {
-//                                             Ok(ControlFlowResult::Text(v1.to_string()))
-//                                         }
-//                                         _ => Err(CustomError::Message(
-//                                             UNEXPECTED_ERROR.to_string(),
-//                                         )),
-//                                     },
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Text => {
-//                         let init: Result<(bool, String), CustomError> =
-//                             Ok((false, String::from("")));
-//                         let result: Result<(bool, String), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_number(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_text(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Text(v1.1)),
-//                                 false => match LispExpression::get_text(&args.2) {
-//                                     Ok(v1) => match result_type {
-//                                         ControlFlowResultType::Text => {
-//                                             Ok(ControlFlowResult::Text(v1))
-//                                         }
-//                                         _ => Err(CustomError::Message(
-//                                             UNEXPECTED_ERROR.to_string(),
-//                                         )),
-//                                     },
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//             LispExpressionResultType::Decimal => match LispExpression::get_decimal(&args.0) {
-//                 Ok(v) => match LispExpression::get_result_type(&types.1) {
-//                     LispExpressionResultType::Number => {
-//                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-//                         let result: Result<(bool, i32), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_decimal(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_number(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Number(v1.1)),
-//                                 false => match LispExpression::get_number(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Number(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Decimal => {
-//                         let init: Result<(bool, BigDecimal), CustomError> =
-//                             match BigDecimal::from_i32(0) {
-//                                 Some(v1) => Ok((false, v1)),
-//                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                             };
-//                         let result: Result<(bool, BigDecimal), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_decimal(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_decimal(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
-//                                 false => match LispExpression::get_decimal(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Boolean => {
-//                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
-//                         let result: Result<(bool, bool), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_decimal(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_boolean(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
-//                                 false => match LispExpression::get_boolean(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Text => {
-//                         let init: Result<(bool, String), CustomError> =
-//                             Ok((false, String::from("")));
-//                         let result: Result<(bool, String), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_decimal(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_text(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Text(v1.1)),
-//                                 false => match LispExpression::get_text(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Text(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//             LispExpressionResultType::Boolean => match LispExpression::get_boolean(&args.0) {
-//                 Ok(v) => match LispExpression::get_result_type(&types.1) {
-//                     LispExpressionResultType::Number => {
-//                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-//                         let result: Result<(bool, i32), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_boolean(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_number(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Number(v1.1)),
-//                                 false => match LispExpression::get_number(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Number(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Decimal => {
-//                         let init: Result<(bool, BigDecimal), CustomError> =
-//                             match BigDecimal::from_i32(0) {
-//                                 Some(v1) => Ok((false, v1)),
-//                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                             };
-//                         let result: Result<(bool, BigDecimal), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_boolean(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_decimal(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
-//                                 false => match LispExpression::get_decimal(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Boolean => {
-//                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
-//                         let result: Result<(bool, bool), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_boolean(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_boolean(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
-//                                 false => match LispExpression::get_boolean(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Text => {
-//                         let init: Result<(bool, String), CustomError> =
-//                             Ok((false, String::from("")));
-//                         let result: Result<(bool, String), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_boolean(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_text(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Text(v1.1)),
-//                                 false => match LispExpression::get_text(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Text(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//             LispExpressionResultType::Text => match LispExpression::get_text(&args.0) {
-//                 Ok(v) => match LispExpression::get_result_type(&types.1) {
-//                     LispExpressionResultType::Number => {
-//                         let init: Result<(bool, i32), CustomError> = Ok((false, 0));
-//                         let result: Result<(bool, i32), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_text(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_number(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Number(v1.1)),
-//                                 false => match LispExpression::get_number(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Number(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Decimal => {
-//                         let init: Result<(bool, BigDecimal), CustomError> =
-//                             match BigDecimal::from_i32(0) {
-//                                 Some(v1) => Ok((false, v1)),
-//                                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
-//                             };
-//                         let result: Result<(bool, BigDecimal), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_text(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_decimal(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Decimal(v1.1)),
-//                                 false => match LispExpression::get_decimal(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Decimal(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Boolean => {
-//                         let init: Result<(bool, bool), CustomError> = Ok((false, false));
-//                         let result: Result<(bool, bool), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_text(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_boolean(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Boolean(v1.1)),
-//                                 false => match LispExpression::get_boolean(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Boolean(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                     LispExpressionResultType::Text => {
-//                         let init: Result<(bool, String), CustomError> =
-//                             Ok((false, String::from("")));
-//                         let result: Result<(bool, String), CustomError> =
-//                             args.1.iter().fold(init, |acc, val| match &acc {
-//                                 Ok(v1) => match v1.0 {
-//                                     true => acc,
-//                                     false => match LispExpression::get_text(&val.0) {
-//                                         Ok(v2) => match v == v2 {
-//                                             true => match LispExpression::get_text(&val.1) {
-//                                                 Ok(v3) => Ok((true, v3)),
-//                                                 Err(e) => Err(e),
-//                                             },
-//                                             false => acc,
-//                                         },
-//                                         Err(e) => Err(e),
-//                                     },
-//                                 },
-//                                 Err(_) => acc,
-//                             });
-//                         match result {
-//                             Ok(v1) => match v1.0 {
-//                                 true => Ok(ControlFlowResult::Text(v1.1)),
-//                                 false => match LispExpression::get_text(&args.2) {
-//                                     Ok(v1) => Ok(ControlFlowResult::Text(v1)),
-//                                     Err(e) => Err(e),
-//                                 },
-//                             },
-//                             Err(e) => Err(e),
-//                         }
-//                     }
-//                 },
-//                 Err(e) => Err(e),
-//             },
-//         },
-//     }
-// }
-// }
+impl NumberMatchExpression {
+    fn eval(&self, result_type: NumberMatchResultType) -> Result<NumberMatchResult, CustomError> {
+        let result: Result<i32, CustomError> = match self {
+            NumberMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_number() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_number(),
+                    Err(e) => Err(e),
+                }
+            }
+            NumberMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_decimal() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_number(),
+                    Err(e) => Err(e),
+                }
+            }
+            NumberMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_text() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_number(),
+                    Err(e) => Err(e),
+                }
+            }
+            NumberMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_boolean() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_number(),
+                    Err(e) => Err(e),
+                }
+            }
+        };
+        match result {
+            Ok(v) => match result_type {
+                NumberMatchResultType::Number => Ok(NumberMatchResult::Number(v)),
+                NumberMatchResultType::Decimal => match BigDecimal::from_i32(v) {
+                    Some(v1) => Ok(NumberMatchResult::Decimal(v1)),
+                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                },
+                NumberMatchResultType::Text => Ok(NumberMatchResult::Text(v.to_string())),
+            },
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl ToNumber for NumberMatchExpression {
+    fn get_number(&self) -> Result<i32, CustomError> {
+        match self.eval(NumberMatchResultType::Number)? {
+            NumberMatchResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToDecimal for NumberMatchExpression {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match self.eval(NumberMatchResultType::Decimal)? {
+            NumberMatchResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToText for NumberMatchExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(NumberMatchResultType::Text)? {
+            NumberMatchResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+// DECIMAL MATCH
+
+#[derive(Debug)]
+enum DecimalMatchResultType {
+    Number,
+    Decimal,
+    Text,
+}
+
+#[derive(Debug)]
+enum DecimalMatchResult {
+    Number(i32),
+    Decimal(BigDecimal),
+    Text(String),
+}
+
+enum DecimalMatchExpression {
+    NumberConditionExpression(
+        (
+            Box<dyn ToNumber>,
+            Vec<(Box<dyn ToNumber>, Box<dyn ToDecimal>)>,
+            Box<dyn ToDecimal>,
+        ),
+    ),
+    DecimalConditionExpression(
+        (
+            Box<dyn ToDecimal>,
+            Vec<(Box<dyn ToDecimal>, Box<dyn ToDecimal>)>,
+            Box<dyn ToDecimal>,
+        ),
+    ),
+    TextConditionExpression(
+        (
+            Box<dyn ToText>,
+            Vec<(Box<dyn ToText>, Box<dyn ToDecimal>)>,
+            Box<dyn ToDecimal>,
+        ),
+    ),
+    BooleanConditionExpression(
+        (
+            Box<dyn ToBoolean>,
+            Vec<(Box<dyn ToBoolean>, Box<dyn ToDecimal>)>,
+            Box<dyn ToDecimal>,
+        ),
+    ),
+}
+
+impl DecimalMatchExpression {
+    fn eval(&self, result_type: DecimalMatchResultType) -> Result<DecimalMatchResult, CustomError> {
+        let result: Result<BigDecimal, CustomError> = match self {
+            DecimalMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_number() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_decimal(),
+                    Err(e) => Err(e),
+                }
+            }
+            DecimalMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_decimal() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_decimal(),
+                    Err(e) => Err(e),
+                }
+            }
+            DecimalMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_text() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_decimal(),
+                    Err(e) => Err(e),
+                }
+            }
+            DecimalMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_boolean() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_decimal(),
+                    Err(e) => Err(e),
+                }
+            }
+        };
+        match result {
+            Ok(v) => match result_type {
+                DecimalMatchResultType::Number => match v.to_i32() {
+                    Some(v1) => Ok(DecimalMatchResult::Number(v1)),
+                    None => Err(CustomError::Message("Unexpected Result".to_string())),
+                },
+                DecimalMatchResultType::Decimal => Ok(DecimalMatchResult::Decimal(v)),
+                DecimalMatchResultType::Text => Ok(DecimalMatchResult::Text(v.to_string())),
+            },
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl ToNumber for DecimalMatchExpression {
+    fn get_number(&self) -> Result<i32, CustomError> {
+        match self.eval(DecimalMatchResultType::Number)? {
+            DecimalMatchResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToDecimal for DecimalMatchExpression {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match self.eval(DecimalMatchResultType::Decimal)? {
+            DecimalMatchResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToText for DecimalMatchExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(DecimalMatchResultType::Text)? {
+            DecimalMatchResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+// TEXT MATCH
+
+#[derive(Debug)]
+enum TextMatchResultType {
+    Text,
+}
+
+#[derive(Debug)]
+enum TextMatchResult {
+    Text(String),
+}
+
+enum TextMatchExpression {
+    NumberConditionExpression(
+        (
+            Box<dyn ToNumber>,
+            Vec<(Box<dyn ToNumber>, Box<dyn ToText>)>,
+            Box<dyn ToText>,
+        ),
+    ),
+    DecimalConditionExpression(
+        (
+            Box<dyn ToDecimal>,
+            Vec<(Box<dyn ToDecimal>, Box<dyn ToText>)>,
+            Box<dyn ToText>,
+        ),
+    ),
+    TextConditionExpression(
+        (
+            Box<dyn ToText>,
+            Vec<(Box<dyn ToText>, Box<dyn ToText>)>,
+            Box<dyn ToText>,
+        ),
+    ),
+    BooleanConditionExpression(
+        (
+            Box<dyn ToBoolean>,
+            Vec<(Box<dyn ToBoolean>, Box<dyn ToText>)>,
+            Box<dyn ToText>,
+        ),
+    ),
+}
+
+impl TextMatchExpression {
+    fn eval(&self, result_type: TextMatchResultType) -> Result<TextMatchResult, CustomError> {
+        let result: Result<String, CustomError> = match self {
+            TextMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_number() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_text(),
+                    Err(e) => Err(e),
+                }
+            }
+            TextMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_decimal() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_text(),
+                    Err(e) => Err(e),
+                }
+            }
+            TextMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_text() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_text(),
+                    Err(e) => Err(e),
+                }
+            }
+            TextMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_boolean() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_text(),
+                    Err(e) => Err(e),
+                }
+            }
+        };
+        match result {
+            Ok(v) => match result_type {
+                TextMatchResultType::Text => Ok(TextMatchResult::Text(v)),
+            },
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl ToText for TextMatchExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(TextMatchResultType::Text)? {
+            TextMatchResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+// BOOLEAN MATCH
+
+#[derive(Debug)]
+enum BooleanMatchResultType {
+    Boolean,
+    Text,
+}
+
+#[derive(Debug)]
+enum BooleanMatchResult {
+    Boolean(bool),
+    Text(String),
+}
+
+enum BooleanMatchExpression {
+    NumberConditionExpression(
+        (
+            Box<dyn ToNumber>,
+            Vec<(Box<dyn ToNumber>, Box<dyn ToBoolean>)>,
+            Box<dyn ToBoolean>,
+        ),
+    ),
+    DecimalConditionExpression(
+        (
+            Box<dyn ToDecimal>,
+            Vec<(Box<dyn ToDecimal>, Box<dyn ToBoolean>)>,
+            Box<dyn ToBoolean>,
+        ),
+    ),
+    TextConditionExpression(
+        (
+            Box<dyn ToText>,
+            Vec<(Box<dyn ToText>, Box<dyn ToBoolean>)>,
+            Box<dyn ToBoolean>,
+        ),
+    ),
+    BooleanConditionExpression(
+        (
+            Box<dyn ToBoolean>,
+            Vec<(Box<dyn ToBoolean>, Box<dyn ToBoolean>)>,
+            Box<dyn ToBoolean>,
+        ),
+    ),
+}
+
+impl BooleanMatchExpression {
+    fn eval(&self, result_type: BooleanMatchResultType) -> Result<BooleanMatchResult, CustomError> {
+        let result: Result<bool, CustomError> = match self {
+            BooleanMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_number() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_boolean(),
+                    Err(e) => Err(e),
+                }
+            }
+            BooleanMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_decimal() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_boolean(),
+                    Err(e) => Err(e),
+                }
+            }
+            BooleanMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_text() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_boolean(),
+                    Err(e) => Err(e),
+                }
+            }
+            BooleanMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
+                match condition.get_boolean() {
+                    Ok(v) => guards
+                        .iter()
+                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                            Ok(v1) => match v == v1 {
+                                true => &val.1,
+                                false => acc,
+                            },
+                            Err(_) => acc,
+                        })
+                        .get_boolean(),
+                    Err(e) => Err(e),
+                }
+            }
+        };
+        match result {
+            Ok(v) => match result_type {
+                BooleanMatchResultType::Boolean => Ok(BooleanMatchResult::Boolean(v)),
+                BooleanMatchResultType::Text => Ok(BooleanMatchResult::Text(v.to_string())),
+            },
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl ToBoolean for BooleanMatchExpression {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(BooleanMatchResultType::Text)? {
+            BooleanMatchResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToText for BooleanMatchExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(BooleanMatchResultType::Text)? {
+            BooleanMatchResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
 
 // And diesel stuff
 fn main() {
@@ -1612,38 +1385,47 @@ fn main() {
     //     "Adventures of Huckleberry Finn".to_string(),
     //     "My favorite book.".to_string(),
     // );
+
     let expr1 = DecimalArithmeticExpression::Add((
-        DecimalArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
-        vec![DecimalArithmeticArg::Decimal(
-            BigDecimal::from_i32(4).unwrap(),
-        )],
+        Box::new(BigDecimal::from_i32(3).unwrap()),
+        vec![Box::new(BigDecimal::from_i32(141).unwrap())],
     ));
     let expr2 = DecimalArithmeticExpression::Multiply((
-        DecimalArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
-        vec![
-            DecimalArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
-            DecimalArithmeticArg::Expression(Box::new(expr1)),
-        ],
+        Box::new(BigDecimal::from_i32(12).unwrap()),
+        vec![Box::new(BigDecimal::from_i32(12).unwrap())],
     ));
 
-    println!("{:?}", expr2.get_decimal().unwrap());
+    println!("expr1: {:?}", expr1.get_decimal().unwrap());
+    println!("expr2: {:?}", expr2.get_decimal().unwrap());
 
     let expr3 = NumberComparatorExpression::GreaterThanEquals((
-        NumberComparatorArg::Number(12),
-        NumberComparatorArg::Number(22),
-        vec![NumberComparatorArg::Number(22)],
+        Box::new(12),
+        Box::new(22),
+        vec![Box::new(22)],
     ));
 
     let expr4 = DecimalComparatorExpression::GreaterThanEquals((
-        DecimalComparatorArg::Decimal(BigDecimal::from(2)),
-        DecimalComparatorArg::Decimal(BigDecimal::from(3)),
-        vec![DecimalComparatorArg::Decimal(
-            BigDecimal::from_str("3.3").unwrap(),
-        )],
+        Box::new(BigDecimal::from(2)),
+        Box::new(BigDecimal::from(3)),
+        vec![Box::new(BigDecimal::from_str("3.3").unwrap())],
     ));
 
-    println!("{:?}", &expr3.get_boolean().unwrap());
-    println!("{:?}", &expr4.get_boolean().unwrap());
+    println!("expr3: {:?}", &expr3.get_boolean().unwrap());
+    println!("expr4 {:?}", &expr4.get_boolean().unwrap());
+
+    let expr5 = DecimalArithmeticExpression::Add((
+        Box::new(BigDecimal::from_i32(3).unwrap()),
+        vec![Box::new(BigDecimal::from_i32(4).unwrap())],
+    ));
+
+    println!("expr5: {:?}", &expr5.get_text().unwrap());
+
+    let expr6 = TextMatchExpression::NumberConditionExpression((
+        Box::new(expr1),
+        vec![(Box::new(expr2), Box::new(expr4))],
+        Box::new(expr5),
+    ));
+    println!("expr6: {:?}", &expr6.get_text().unwrap());
 }
 
 // #[cfg(test)]
