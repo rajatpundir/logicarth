@@ -5,13 +5,13 @@
  */
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
+use core::fmt::Debug;
 use std::collections::HashMap;
 use std::str::FromStr;
 
 const UNEXPECTED_ERROR: &str = "Unexpected Error";
 
 // Making invalid expressions syntactically invalid, probably by wrapping expressions of different result types into their own types
-// 0. Prefer match over if, for consistency
 // 1. Do Internationalization
 // 2. Implement concat, regex, identity
 // 3. Implement symbols
@@ -21,6 +21,48 @@ const UNEXPECTED_ERROR: &str = "Unexpected Error";
 enum CustomError {
     Message(String),
     Messages(HashMap<String, CustomError>),
+}
+
+// Traits
+
+trait ToNumber {
+    fn get_number(&self) -> Result<i32, CustomError>;
+}
+
+impl Debug for dyn ToNumber {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.get_number())
+    }
+}
+
+trait ToDecimal {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError>;
+}
+
+impl Debug for dyn ToDecimal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.get_decimal())
+    }
+}
+
+trait ToText {
+    fn get_text(&self) -> Result<String, CustomError>;
+}
+
+impl Debug for dyn ToText {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.get_text())
+    }
+}
+
+trait ToBoolean {
+    fn get_boolean(&self) -> Result<bool, CustomError>;
+}
+
+impl Debug for dyn ToBoolean {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:?}", self.get_boolean())
+    }
 }
 
 // Arithmetic Ops
@@ -52,10 +94,8 @@ enum ArithmeticOperator {
 
 #[derive(Debug)]
 enum NumberArithmeticArg {
-    // Note. Decimal is not allowed as an arg to avoid loss of precision
     Number(i32),
-    NumberArithmeticExpression(NumberArithmeticExpression),
-    // Expression(ArithmeticControlFlowExpression),
+    Expression(Box<dyn ToNumber>),
 }
 
 #[derive(Debug)]
@@ -68,27 +108,6 @@ enum NumberArithmeticExpression {
 }
 
 impl NumberArithmeticExpression {
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number)? {
-            ArithmeticResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(ArithmeticResultType::Decimal)? {
-            ArithmeticResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ArithmeticResultType::Text)? {
-            ArithmeticResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
         let (args, operator) = match self {
             NumberArithmeticExpression::Add(v) => (v, ArithmeticOperator::Add),
@@ -99,7 +118,7 @@ impl NumberArithmeticExpression {
         };
         let init: Result<i32, CustomError> = match &args.0 {
             NumberArithmeticArg::Number(v) => Ok(*v),
-            NumberArithmeticArg::NumberArithmeticExpression(v1) => v1.get_number(),
+            NumberArithmeticArg::Expression(v) => v.get_number(),
         };
         let result: Result<i32, CustomError> = args.1.iter().fold(init, |acc, val| match &acc {
             Ok(v) => match val {
@@ -110,7 +129,7 @@ impl NumberArithmeticExpression {
                     ArithmeticOperator::Divide => Ok(v / *v1),
                     ArithmeticOperator::Modulus => Ok(v % *v1),
                 },
-                NumberArithmeticArg::NumberArithmeticExpression(v1) => match v1.get_number() {
+                NumberArithmeticArg::Expression(v1) => match v1.get_number() {
                     Ok(v2) => match operator {
                         ArithmeticOperator::Add => Ok(v + v2),
                         ArithmeticOperator::Multiply => Ok(v * v2),
@@ -137,16 +156,40 @@ impl NumberArithmeticExpression {
     }
 }
 
+impl ToNumber for NumberArithmeticExpression {
+    fn get_number(&self) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number)? {
+            ArithmeticResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToDecimal for NumberArithmeticExpression {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal)? {
+            ArithmeticResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToText for NumberArithmeticExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(ArithmeticResultType::Text)? {
+            ArithmeticResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
 // DECIMAL ARITHMETIC
 
 #[derive(Debug)]
 enum DecimalArithmeticArg {
-    // Note. Decimal is not allowed as an arg to avoid loss of precision
     Number(i32),
     Decimal(BigDecimal),
-    NumberArithmeticExpression(NumberArithmeticExpression),
-    DecimalArithmeticExpression(DecimalArithmeticExpression),
-    // Expression(ArithmeticControlFlowExpression),
+    Expression(Box<dyn ToDecimal>),
 }
 
 #[derive(Debug)]
@@ -159,27 +202,6 @@ enum DecimalArithmeticExpression {
 }
 
 impl DecimalArithmeticExpression {
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number)? {
-            ArithmeticResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(ArithmeticResultType::Decimal)? {
-            ArithmeticResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ArithmeticResultType::Text)? {
-            ArithmeticResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
         let (args, operator) = match self {
             DecimalArithmeticExpression::Add(v) => (v, ArithmeticOperator::Add),
@@ -204,8 +226,7 @@ impl DecimalArithmeticExpression {
                 temp *= v1;
                 Ok(temp)
             }
-            DecimalArithmeticArg::NumberArithmeticExpression(v) => v.get_decimal(),
-            DecimalArithmeticArg::DecimalArithmeticExpression(v) => v.get_decimal(),
+            DecimalArithmeticArg::Expression(v) => v.get_decimal(),
         };
         let result: Result<BigDecimal, CustomError> =
             args.1.iter().fold(init, |acc, val| match &acc {
@@ -227,30 +248,16 @@ impl DecimalArithmeticExpression {
                         ArithmeticOperator::Divide => Ok(v / v1),
                         ArithmeticOperator::Modulus => Ok(v % v1),
                     },
-                    DecimalArithmeticArg::NumberArithmeticExpression(v1) => {
-                        match v1.get_decimal() {
-                            Ok(v2) => match operator {
-                                ArithmeticOperator::Add => Ok(v + v2),
-                                ArithmeticOperator::Multiply => Ok(v * v2),
-                                ArithmeticOperator::Subtract => Ok(v - v2),
-                                ArithmeticOperator::Divide => Ok(v / v2),
-                                ArithmeticOperator::Modulus => Ok(v % v2),
-                            },
-                            Err(e) => Err(e),
-                        }
-                    }
-                    DecimalArithmeticArg::DecimalArithmeticExpression(v1) => {
-                        match v1.get_decimal() {
-                            Ok(v2) => match operator {
-                                ArithmeticOperator::Add => Ok(v + v2),
-                                ArithmeticOperator::Multiply => Ok(v * v2),
-                                ArithmeticOperator::Subtract => Ok(v - v2),
-                                ArithmeticOperator::Divide => Ok(v / v2),
-                                ArithmeticOperator::Modulus => Ok(v % v2),
-                            },
-                            Err(e) => Err(e),
-                        }
-                    }
+                    DecimalArithmeticArg::Expression(v1) => match v1.get_decimal() {
+                        Ok(v2) => match operator {
+                            ArithmeticOperator::Add => Ok(v + v2),
+                            ArithmeticOperator::Multiply => Ok(v * v2),
+                            ArithmeticOperator::Subtract => Ok(v - v2),
+                            ArithmeticOperator::Divide => Ok(v / v2),
+                            ArithmeticOperator::Modulus => Ok(v % v2),
+                        },
+                        Err(e) => Err(e),
+                    },
                 },
                 Err(_) => acc,
             });
@@ -270,6 +277,33 @@ impl DecimalArithmeticExpression {
                 Ok(v) => Ok(ArithmeticResult::Text(v.to_string())),
                 Err(e) => Err(e),
             },
+        }
+    }
+}
+
+impl ToNumber for DecimalArithmeticExpression {
+    fn get_number(&self) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number)? {
+            ArithmeticResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToDecimal for DecimalArithmeticExpression {
+    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal)? {
+            ArithmeticResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToText for DecimalArithmeticExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(ArithmeticResultType::Text)? {
+            ArithmeticResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
         }
     }
 }
@@ -301,10 +335,8 @@ enum ComparatorOperator {
 
 #[derive(Debug)]
 enum NumberComparatorArg {
-    // Note. Decimal is not allowed as an arg to avoid loss of precision
     Number(i32),
-    NumberArithmeticExpression(NumberArithmeticExpression),
-    // Expression(ArithmeticControlFlowExpression),
+    Expression(Box<dyn ToNumber>),
 }
 
 #[derive(Debug)]
@@ -347,20 +379,6 @@ enum NumberComparatorExpression {
 }
 
 impl NumberComparatorExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean)? {
-            ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text)? {
-            ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
         let (args, operator) = match self {
             NumberComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
@@ -375,11 +393,11 @@ impl NumberComparatorExpression {
         };
         let arg0: Result<i32, CustomError> = match &args.0 {
             NumberComparatorArg::Number(v) => Ok(*v),
-            NumberComparatorArg::NumberArithmeticExpression(v) => v.get_number(),
+            NumberComparatorArg::Expression(v) => v.get_number(),
         };
         let arg1: Result<i32, CustomError> = match &args.1 {
             NumberComparatorArg::Number(v) => Ok(*v),
-            NumberComparatorArg::NumberArithmeticExpression(v) => v.get_number(),
+            NumberComparatorArg::Expression(v) => v.get_number(),
         };
         let init: Result<bool, CustomError> = match (arg0, arg1) {
             (Ok(v), Ok(v1)) => match operator {
@@ -406,7 +424,7 @@ impl NumberComparatorExpression {
                     .chain(&args.2)
                     .map(|val| match val {
                         NumberComparatorArg::Number(v) => Ok(*v),
-                        NumberComparatorArg::NumberArithmeticExpression(v) => v.get_number(),
+                        NumberComparatorArg::Expression(v) => v.get_number(),
                     })
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
@@ -439,15 +457,31 @@ impl NumberComparatorExpression {
     }
 }
 
+impl ToText for NumberComparatorExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToBoolean for NumberComparatorExpression {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
 // DECIMAL COMPARATOR
 
 #[derive(Debug)]
 enum DecimalComparatorArg {
     Number(i32),
     Decimal(BigDecimal),
-    NumberArithmeticExpression(NumberArithmeticExpression),
-    DecimalArithmeticExpression(DecimalArithmeticExpression),
-    // Expression(ArithmeticControlFlowExpression),
+    Expression(Box<dyn ToDecimal>),
 }
 
 #[derive(Debug)]
@@ -490,20 +524,6 @@ enum DecimalComparatorExpression {
 }
 
 impl DecimalComparatorExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean)? {
-            ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text)? {
-            ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
         let (args, operator) = match self {
             DecimalComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
@@ -522,8 +542,7 @@ impl DecimalComparatorExpression {
                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
             },
             DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
-            DecimalComparatorArg::NumberArithmeticExpression(v) => v.get_decimal(),
-            DecimalComparatorArg::DecimalArithmeticExpression(v) => v.get_decimal(),
+            DecimalComparatorArg::Expression(v) => v.get_decimal(),
         };
         let arg1: Result<BigDecimal, CustomError> = match &args.1 {
             DecimalComparatorArg::Number(v) => match BigDecimal::from_i32(*v) {
@@ -531,8 +550,7 @@ impl DecimalComparatorExpression {
                 None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
             },
             DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
-            DecimalComparatorArg::NumberArithmeticExpression(v) => v.get_decimal(),
-            DecimalComparatorArg::DecimalArithmeticExpression(v) => v.get_decimal(),
+            DecimalComparatorArg::Expression(v) => v.get_decimal(),
         };
         let init: Result<bool, CustomError> = match (arg0, arg1) {
             (Ok(v), Ok(v1)) => match operator {
@@ -563,8 +581,7 @@ impl DecimalComparatorExpression {
                             None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
                         },
                         DecimalComparatorArg::Decimal(v) => Ok(v.clone()),
-                        DecimalComparatorArg::NumberArithmeticExpression(v) => v.get_decimal(),
-                        DecimalComparatorArg::DecimalArithmeticExpression(v) => v.get_decimal(),
+                        DecimalComparatorArg::Expression(v) => v.get_decimal(),
                     })
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
@@ -597,19 +614,31 @@ impl DecimalComparatorExpression {
     }
 }
 
+impl ToText for DecimalComparatorExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToBoolean for DecimalComparatorExpression {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
 // TEXT COMPARATOR
 
 #[derive(Debug)]
 enum TextComparatorArg {
     Number(i32),
     Decimal(BigDecimal),
-    NumberArithmeticExpression(NumberArithmeticExpression),
-    DecimalArithmeticExpression(DecimalArithmeticExpression),
-    NumberComparatorExpression(NumberComparatorExpression),
-    DecimalComparatorExpression(DecimalComparatorExpression),
-    LogicalBinaryExpression(LogicalBinaryExpression),
-    LogicalUnaryExpression(LogicalUnaryExpression),
-    // Expression(ArithmeticControlFlowExpression),
+    Expression(Box<dyn ToText>),
 }
 
 #[derive(Debug)]
@@ -622,20 +651,6 @@ enum TextComparatorExpression {
 }
 
 impl TextComparatorExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean)? {
-            ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text)? {
-            ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
         let (args, operator) = match self {
             TextComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
@@ -649,22 +664,12 @@ impl TextComparatorExpression {
         let arg0: Result<String, CustomError> = match &args.0 {
             TextComparatorArg::Number(v) => Ok(v.to_string()),
             TextComparatorArg::Decimal(v) => Ok(v.to_string()),
-            TextComparatorArg::NumberArithmeticExpression(v) => v.get_text(),
-            TextComparatorArg::DecimalArithmeticExpression(v) => v.get_text(),
-            TextComparatorArg::NumberComparatorExpression(v) => v.get_text(),
-            TextComparatorArg::DecimalComparatorExpression(v) => v.get_text(),
-            TextComparatorArg::LogicalBinaryExpression(v) => v.get_text(),
-            TextComparatorArg::LogicalUnaryExpression(v) => v.get_text(),
+            TextComparatorArg::Expression(v) => v.get_text(),
         };
         let arg1: Result<String, CustomError> = match &args.1 {
             TextComparatorArg::Number(v) => Ok(v.to_string()),
             TextComparatorArg::Decimal(v) => Ok(v.to_string()),
-            TextComparatorArg::NumberArithmeticExpression(v) => v.get_text(),
-            TextComparatorArg::DecimalArithmeticExpression(v) => v.get_text(),
-            TextComparatorArg::NumberComparatorExpression(v) => v.get_text(),
-            TextComparatorArg::DecimalComparatorExpression(v) => v.get_text(),
-            TextComparatorArg::LogicalBinaryExpression(v) => v.get_text(),
-            TextComparatorArg::LogicalUnaryExpression(v) => v.get_text(),
+            TextComparatorArg::Expression(v) => v.get_text(),
         };
         let init: Result<bool, CustomError> = match (arg0, arg1) {
             (Ok(v), Ok(v1)) => match operator {
@@ -692,12 +697,7 @@ impl TextComparatorExpression {
                     .map(|val| match val {
                         TextComparatorArg::Number(v) => Ok(v.to_string()),
                         TextComparatorArg::Decimal(v) => Ok(v.to_string()),
-                        TextComparatorArg::NumberArithmeticExpression(v) => v.get_text(),
-                        TextComparatorArg::DecimalArithmeticExpression(v) => v.get_text(),
-                        TextComparatorArg::NumberComparatorExpression(v) => v.get_text(),
-                        TextComparatorArg::DecimalComparatorExpression(v) => v.get_text(),
-                        TextComparatorArg::LogicalBinaryExpression(v) => v.get_text(),
-                        TextComparatorArg::LogicalUnaryExpression(v) => v.get_text(),
+                        TextComparatorArg::Expression(v) => v.get_text(),
                     })
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
@@ -730,6 +730,24 @@ impl TextComparatorExpression {
     }
 }
 
+impl ToText for TextComparatorExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToBoolean for TextComparatorExpression {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
 // LOGICAL OPS
 
 #[derive(Debug)]
@@ -747,9 +765,7 @@ enum LogicalResult {
 #[derive(Debug)]
 enum LogicalOperatorArg {
     Boolean(bool),
-    NumberComparatorExpression(NumberComparatorExpression),
-    DecimalComparatorExpression(DecimalComparatorExpression),
-    TextComparatorExpression(TextComparatorExpression), // Expression(ArithmeticControlFlowExpression),
+    Expression(Box<dyn ToBoolean>),
 }
 
 // BINARY LOGICAL
@@ -779,20 +795,6 @@ enum LogicalBinaryExpression {
 }
 
 impl LogicalBinaryExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(LogicalResultType::Boolean)? {
-            LogicalResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(LogicalResultType::Text)? {
-            LogicalResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: LogicalResultType) -> Result<LogicalResult, CustomError> {
         let (args, operator) = match self {
             LogicalBinaryExpression::And(v) => (v, LogicalBinaryOperator::And),
@@ -800,15 +802,11 @@ impl LogicalBinaryExpression {
         };
         let arg0: Result<bool, CustomError> = match &args.0 {
             LogicalOperatorArg::Boolean(v) => Ok(*v),
-            LogicalOperatorArg::NumberComparatorExpression(v) => v.get_boolean(),
-            LogicalOperatorArg::DecimalComparatorExpression(v) => v.get_boolean(),
-            LogicalOperatorArg::TextComparatorExpression(v) => v.get_boolean(),
+            LogicalOperatorArg::Expression(v) => v.get_boolean(),
         };
         let arg1: Result<bool, CustomError> = match &args.1 {
             LogicalOperatorArg::Boolean(v) => Ok(*v),
-            LogicalOperatorArg::NumberComparatorExpression(v) => v.get_boolean(),
-            LogicalOperatorArg::DecimalComparatorExpression(v) => v.get_boolean(),
-            LogicalOperatorArg::TextComparatorExpression(v) => v.get_boolean(),
+            LogicalOperatorArg::Expression(v) => v.get_boolean(),
         };
         let init: Result<bool, CustomError> = match (arg0, arg1) {
             (Ok(v), Ok(v1)) => match operator {
@@ -832,9 +830,7 @@ impl LogicalBinaryExpression {
                     .chain(&args.2)
                     .map(|val| match val {
                         LogicalOperatorArg::Boolean(v) => Ok(*v),
-                        LogicalOperatorArg::NumberComparatorExpression(v) => v.get_boolean(),
-                        LogicalOperatorArg::DecimalComparatorExpression(v) => v.get_boolean(),
-                        LogicalOperatorArg::TextComparatorExpression(v) => v.get_boolean(),
+                        LogicalOperatorArg::Expression(v) => v.get_boolean(),
                     })
                     .collect();
                 let result: Result<bool, CustomError> =
@@ -860,6 +856,24 @@ impl LogicalBinaryExpression {
     }
 }
 
+impl ToText for LogicalBinaryExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(LogicalResultType::Text)? {
+            LogicalResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToBoolean for LogicalBinaryExpression {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(LogicalResultType::Boolean)? {
+            LogicalResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
 // UNARY LOGICAL
 
 #[derive(Debug)]
@@ -873,29 +887,13 @@ enum LogicalUnaryExpression {
 }
 
 impl LogicalUnaryExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(LogicalResultType::Boolean)? {
-            LogicalResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(LogicalResultType::Text)? {
-            LogicalResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
-        }
-    }
-
     fn eval(&self, result_type: LogicalResultType) -> Result<LogicalResult, CustomError> {
-        let (args, operator) = match self {
+        let (args, _operator) = match self {
             LogicalUnaryExpression::Not(v) => (v, LogicalUnaryOperator::Not),
         };
         let result: Result<bool, CustomError> = match args.as_ref() {
             LogicalOperatorArg::Boolean(v) => Ok(*v),
-            LogicalOperatorArg::NumberComparatorExpression(v) => v.get_boolean(),
-            LogicalOperatorArg::DecimalComparatorExpression(v) => v.get_boolean(),
-            LogicalOperatorArg::TextComparatorExpression(v) => v.get_boolean(),
+            LogicalOperatorArg::Expression(v) => v.get_boolean(),
         };
         match result {
             Ok(v) => match result_type {
@@ -905,6 +903,40 @@ impl LogicalUnaryExpression {
             Err(e) => Err(e),
         }
     }
+}
+
+impl ToText for LogicalUnaryExpression {
+    fn get_text(&self) -> Result<String, CustomError> {
+        match self.eval(LogicalResultType::Text)? {
+            LogicalResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+impl ToBoolean for LogicalUnaryExpression {
+    fn get_boolean(&self) -> Result<bool, CustomError> {
+        match self.eval(LogicalResultType::Boolean)? {
+            LogicalResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+        }
+    }
+}
+
+// MATCH
+// Write a generic data structure to get what is required
+// Other expressions are based on what types of args they can take
+// There should also be 4 match expressions; for number, decimal, text, boolean
+
+#[derive(Debug)]
+enum LispExpression {
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    DecimalArithmeticExpression(DecimalArithmeticExpression),
+    NumberComparatorExpression(NumberComparatorExpression),
+    DecimalComparatorExpression(DecimalComparatorExpression),
+    TextComparatorExpression(TextComparatorExpression),
+    LogicalBinaryExpression(LogicalBinaryExpression),
+    LogicalUnaryExpression(LogicalUnaryExpression),
 }
 
 // impl LispExpression {
@@ -1590,7 +1622,7 @@ fn main() {
         DecimalArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
         vec![
             DecimalArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
-            DecimalArithmeticArg::DecimalArithmeticExpression(expr1),
+            DecimalArithmeticArg::Expression(Box::new(expr1)),
         ],
     )));
 
@@ -1605,7 +1637,9 @@ fn main() {
     let expr4 = DecimalComparatorExpression::GreaterThanEquals(Box::new((
         DecimalComparatorArg::Decimal(BigDecimal::from(2)),
         DecimalComparatorArg::Decimal(BigDecimal::from(3)),
-        vec![DecimalComparatorArg::Decimal(BigDecimal::from_str("3.3").unwrap()),],
+        vec![DecimalComparatorArg::Decimal(
+            BigDecimal::from_str("3.3").unwrap(),
+        )],
     )));
 
     println!("{:?}", &expr3.get_boolean().unwrap());
