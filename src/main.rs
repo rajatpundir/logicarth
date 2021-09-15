@@ -4,6 +4,14 @@
  * Written by Rajat Pundir <rajatpundir13@gmail.com>, August 2021
  */
 
+// Notes.
+// Making invalid expressions syntactically invalid, probably by wrapping expressions of different result types into their own types
+// 1. Do Internationalization
+// 2. Identity op may no longer be necessary, since constants can be plugged right in by wrapping them in a box. Concat can be implemented later, regex may not be necessary.
+// 3. Implement symbols
+// 4. Implement dot operator
+// 5. Write test cases and build some audio visual documentation
+
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
 use std::collections::HashMap;
@@ -12,12 +20,6 @@ use std::vec;
 
 const UNEXPECTED_ERROR: &str = "Unexpected Error";
 
-// Making invalid expressions syntactically invalid, probably by wrapping expressions of different result types into their own types
-// 1. Do Internationalization
-// 2. Implement concat, regex, identity
-// 3. Implement symbols
-// 4. Implement dot operator
-// 5. Write test cases and build some audio visual documentation
 #[derive(Debug, Clone)]
 enum CustomError {
     Message(String),
@@ -245,10 +247,6 @@ impl DecimalArithmeticExpression {
             DecimalArithmeticExpression::Subtract(v) => (v, ArithmeticOperator::Subtract),
             DecimalArithmeticExpression::Divide(v) => (v, ArithmeticOperator::Divide),
             DecimalArithmeticExpression::Modulus(v) => (v, ArithmeticOperator::Modulus),
-        };
-        let mut temp: BigDecimal = match BigDecimal::from_i32(1) {
-            Some(v) => v,
-            None => return Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
         };
         let init: Result<BigDecimal, CustomError> = args.0.get_decimal();
         let result: Result<BigDecimal, CustomError> =
