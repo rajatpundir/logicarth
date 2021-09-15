@@ -25,6 +25,7 @@ enum Language {
 #[derive(Debug, Clone)]
 enum Strings {
     UnexpectedError,
+    MissingSymbol,
 }
 
 impl Strings {
@@ -32,6 +33,9 @@ impl Strings {
         let result: &str = match self {
             Strings::UnexpectedError => match lang {
                 Language::English => "Unexpected Error",
+            },
+            Strings::MissingSymbol => match lang {
+                Language::English => "Symbol not found",
             },
         };
         result.to_string()
@@ -44,26 +48,40 @@ enum CustomError {
     Messages(HashMap<String, CustomError>),
 }
 
+// Symbols
+
+enum Leaf {
+    Number(i32),
+    Decimal(BigDecimal),
+    Text(String),
+    Boolean(bool),
+}
+
+enum Symbol {
+    Leaf(Leaf),
+    Symbols(HashMap<String, Symbol>),
+}
+
 // Traits
 
 trait ToNumber {
-    fn get_number(&self) -> Result<i32, CustomError>;
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError>;
 }
 
 impl Debug for dyn ToNumber {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self.get_number())
+        write!(f, "{:?}", self.get_number(&HashMap::new()))
     }
 }
 
 impl ToNumber for i32 {
-    fn get_number(&self) -> Result<i32, CustomError> {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
         Ok(*self)
     }
 }
 
 impl ToNumber for BigDecimal {
-    fn get_number(&self) -> Result<i32, CustomError> {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
         match self.to_i32() {
             Some(v) => Ok(v),
             None => Err(CustomError::Message(Strings::UnexpectedError)),
@@ -72,17 +90,17 @@ impl ToNumber for BigDecimal {
 }
 
 trait ToDecimal {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError>;
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError>;
 }
 
 impl Debug for dyn ToDecimal {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self.get_decimal())
+        write!(f, "{:?}", self.get_decimal(&HashMap::new()))
     }
 }
 
 impl ToDecimal for i32 {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
         match BigDecimal::from_i32(*self) {
             Some(v) => Ok(v),
             None => Err(CustomError::Message(Strings::UnexpectedError)),
@@ -91,57 +109,57 @@ impl ToDecimal for i32 {
 }
 
 impl ToDecimal for BigDecimal {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
         Ok(self.clone())
     }
 }
 
 trait ToText {
-    fn get_text(&self) -> Result<String, CustomError>;
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError>;
 }
 
 impl Debug for dyn ToText {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self.get_text())
+        write!(f, "{:?}", self.get_text(&HashMap::new()))
     }
 }
 
 impl ToText for i32 {
-    fn get_text(&self) -> Result<String, CustomError> {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
 }
 
 impl ToText for BigDecimal {
-    fn get_text(&self) -> Result<String, CustomError> {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
 }
 
 impl ToText for String {
-    fn get_text(&self) -> Result<String, CustomError> {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
 }
 
 impl ToText for bool {
-    fn get_text(&self) -> Result<String, CustomError> {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
 }
 
 trait ToBoolean {
-    fn get_boolean(&self) -> Result<bool, CustomError>;
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError>;
 }
 
 impl Debug for dyn ToBoolean {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:?}", self.get_boolean())
+        write!(f, "{:?}", self.get_boolean(&HashMap::new()))
     }
 }
 
 impl ToBoolean for bool {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
         Ok(*self)
     }
 }
@@ -183,7 +201,11 @@ enum NumberArithmeticExpression {
 }
 
 impl NumberArithmeticExpression {
-    fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: ArithmeticResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<ArithmeticResult, CustomError> {
         let (args, operator) = match self {
             NumberArithmeticExpression::Add(v) => (v, ArithmeticOperator::Add),
             NumberArithmeticExpression::Multiply(v) => (v, ArithmeticOperator::Multiply),
@@ -191,9 +213,9 @@ impl NumberArithmeticExpression {
             NumberArithmeticExpression::Divide(v) => (v, ArithmeticOperator::Divide),
             NumberArithmeticExpression::Modulus(v) => (v, ArithmeticOperator::Modulus),
         };
-        let init: Result<i32, CustomError> = args.0.get_number();
+        let init: Result<i32, CustomError> = args.0.get_number(symbols);
         let result: Result<i32, CustomError> = args.1.iter().fold(init, |acc, val| match &acc {
-            Ok(v) => match val.get_number() {
+            Ok(v) => match val.get_number(symbols) {
                 Ok(v1) => match operator {
                     ArithmeticOperator::Add => Ok(v + v1),
                     ArithmeticOperator::Multiply => Ok(v * v1),
@@ -220,8 +242,8 @@ impl NumberArithmeticExpression {
 }
 
 impl ToNumber for NumberArithmeticExpression {
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number)? {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number, symbols)? {
             ArithmeticResult::Number(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -229,8 +251,8 @@ impl ToNumber for NumberArithmeticExpression {
 }
 
 impl ToDecimal for NumberArithmeticExpression {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(ArithmeticResultType::Decimal)? {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal, symbols)? {
             ArithmeticResult::Decimal(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -238,8 +260,8 @@ impl ToDecimal for NumberArithmeticExpression {
 }
 
 impl ToText for NumberArithmeticExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ArithmeticResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ArithmeticResultType::Text, symbols)? {
             ArithmeticResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -258,7 +280,11 @@ enum DecimalArithmeticExpression {
 }
 
 impl DecimalArithmeticExpression {
-    fn eval(&self, result_type: ArithmeticResultType) -> Result<ArithmeticResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: ArithmeticResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<ArithmeticResult, CustomError> {
         let (args, operator) = match self {
             DecimalArithmeticExpression::Add(v) => (v, ArithmeticOperator::Add),
             DecimalArithmeticExpression::Multiply(v) => (v, ArithmeticOperator::Multiply),
@@ -266,10 +292,10 @@ impl DecimalArithmeticExpression {
             DecimalArithmeticExpression::Divide(v) => (v, ArithmeticOperator::Divide),
             DecimalArithmeticExpression::Modulus(v) => (v, ArithmeticOperator::Modulus),
         };
-        let init: Result<BigDecimal, CustomError> = args.0.get_decimal();
+        let init: Result<BigDecimal, CustomError> = args.0.get_decimal(symbols);
         let result: Result<BigDecimal, CustomError> =
             args.1.iter().fold(init, |acc, val| match &acc {
-                Ok(v) => match val.get_decimal() {
+                Ok(v) => match val.get_decimal(symbols) {
                     Ok(v1) => match operator {
                         ArithmeticOperator::Add => Ok(v + v1),
                         ArithmeticOperator::Multiply => Ok(v * v1),
@@ -302,8 +328,8 @@ impl DecimalArithmeticExpression {
 }
 
 impl ToNumber for DecimalArithmeticExpression {
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number)? {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number, symbols)? {
             ArithmeticResult::Number(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -311,8 +337,8 @@ impl ToNumber for DecimalArithmeticExpression {
 }
 
 impl ToDecimal for DecimalArithmeticExpression {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(ArithmeticResultType::Decimal)? {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal, symbols)? {
             ArithmeticResult::Decimal(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -320,8 +346,8 @@ impl ToDecimal for DecimalArithmeticExpression {
 }
 
 impl ToText for DecimalArithmeticExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ArithmeticResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ArithmeticResultType::Text, symbols)? {
             ArithmeticResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -363,7 +389,11 @@ enum NumberComparatorExpression {
 }
 
 impl NumberComparatorExpression {
-    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: ComparatorResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<ComparatorResult, CustomError> {
         let (args, operator) = match self {
             NumberComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
             NumberComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
@@ -375,18 +405,19 @@ impl NumberComparatorExpression {
                 (v, ComparatorOperator::LessThanEquals)
             }
         };
-        let init: Result<bool, CustomError> = match (args.0.get_number(), args.1.get_number()) {
-            (Ok(v), Ok(v1)) => match operator {
-                ComparatorOperator::Equals => Ok(v == v1),
-                ComparatorOperator::GreaterThan => Ok(v < v1),
-                ComparatorOperator::LessThan => Ok(v > v1),
-                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
-                ComparatorOperator::LessThanEquals => Ok(v >= v1),
-            },
-            (Ok(_), Err(e)) => Err(e),
-            (Err(e), Ok(_)) => Err(e),
-            (Err(e), Err(_)) => Err(e),
-        };
+        let init: Result<bool, CustomError> =
+            match (args.0.get_number(symbols), args.1.get_number(symbols)) {
+                (Ok(v), Ok(v1)) => match operator {
+                    ComparatorOperator::Equals => Ok(v == v1),
+                    ComparatorOperator::GreaterThan => Ok(v < v1),
+                    ComparatorOperator::LessThan => Ok(v > v1),
+                    ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                    ComparatorOperator::LessThanEquals => Ok(v >= v1),
+                },
+                (Ok(_), Err(e)) => Err(e),
+                (Err(e), Ok(_)) => Err(e),
+                (Err(e), Err(_)) => Err(e),
+            };
         match args.2.len() == 0 {
             true => match init {
                 Ok(v) => match result_type {
@@ -398,7 +429,7 @@ impl NumberComparatorExpression {
             false => {
                 let evaluated_args: Vec<Result<i32, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| val.get_number())
+                    .map(|val| val.get_number(symbols))
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
                     .iter()
@@ -431,8 +462,8 @@ impl NumberComparatorExpression {
 }
 
 impl ToText for NumberComparatorExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text, symbols)? {
             ComparatorResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -440,8 +471,8 @@ impl ToText for NumberComparatorExpression {
 }
 
 impl ToBoolean for NumberComparatorExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean)? {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean, symbols)? {
             ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -490,7 +521,11 @@ enum DecimalComparatorExpression {
 }
 
 impl DecimalComparatorExpression {
-    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: ComparatorResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<ComparatorResult, CustomError> {
         let (args, operator) = match self {
             DecimalComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
             DecimalComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
@@ -502,18 +537,19 @@ impl DecimalComparatorExpression {
                 (v, ComparatorOperator::LessThanEquals)
             }
         };
-        let init: Result<bool, CustomError> = match (args.0.get_decimal(), args.1.get_decimal()) {
-            (Ok(v), Ok(v1)) => match operator {
-                ComparatorOperator::Equals => Ok(v == v1),
-                ComparatorOperator::GreaterThan => Ok(v < v1),
-                ComparatorOperator::LessThan => Ok(v > v1),
-                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
-                ComparatorOperator::LessThanEquals => Ok(v >= v1),
-            },
-            (Ok(_), Err(e)) => Err(e),
-            (Err(e), Ok(_)) => Err(e),
-            (Err(e), Err(_)) => Err(e),
-        };
+        let init: Result<bool, CustomError> =
+            match (args.0.get_decimal(symbols), args.1.get_decimal(symbols)) {
+                (Ok(v), Ok(v1)) => match operator {
+                    ComparatorOperator::Equals => Ok(v == v1),
+                    ComparatorOperator::GreaterThan => Ok(v < v1),
+                    ComparatorOperator::LessThan => Ok(v > v1),
+                    ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                    ComparatorOperator::LessThanEquals => Ok(v >= v1),
+                },
+                (Ok(_), Err(e)) => Err(e),
+                (Err(e), Ok(_)) => Err(e),
+                (Err(e), Err(_)) => Err(e),
+            };
         match args.2.len() == 0 {
             true => match init {
                 Ok(v) => match result_type {
@@ -525,7 +561,7 @@ impl DecimalComparatorExpression {
             false => {
                 let evaluated_args: Vec<Result<BigDecimal, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| val.get_decimal())
+                    .map(|val| val.get_decimal(symbols))
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
                     .iter()
@@ -558,8 +594,8 @@ impl DecimalComparatorExpression {
 }
 
 impl ToText for DecimalComparatorExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text, symbols)? {
             ComparatorResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -567,8 +603,8 @@ impl ToText for DecimalComparatorExpression {
 }
 
 impl ToBoolean for DecimalComparatorExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean)? {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean, symbols)? {
             ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -587,7 +623,11 @@ enum TextComparatorExpression {
 }
 
 impl TextComparatorExpression {
-    fn eval(&self, result_type: ComparatorResultType) -> Result<ComparatorResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: ComparatorResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<ComparatorResult, CustomError> {
         let (args, operator) = match self {
             TextComparatorExpression::Equals(v) => (v, ComparatorOperator::Equals),
             TextComparatorExpression::GreaterThan(v) => (v, ComparatorOperator::GreaterThan),
@@ -597,18 +637,19 @@ impl TextComparatorExpression {
             }
             TextComparatorExpression::LessThanEquals(v) => (v, ComparatorOperator::LessThanEquals),
         };
-        let init: Result<bool, CustomError> = match (args.0.get_text(), args.1.get_text()) {
-            (Ok(v), Ok(v1)) => match operator {
-                ComparatorOperator::Equals => Ok(v == v1),
-                ComparatorOperator::GreaterThan => Ok(v < v1),
-                ComparatorOperator::LessThan => Ok(v > v1),
-                ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
-                ComparatorOperator::LessThanEquals => Ok(v >= v1),
-            },
-            (Ok(_), Err(e)) => Err(e),
-            (Err(e), Ok(_)) => Err(e),
-            (Err(e), Err(_)) => Err(e),
-        };
+        let init: Result<bool, CustomError> =
+            match (args.0.get_text(symbols), args.1.get_text(symbols)) {
+                (Ok(v), Ok(v1)) => match operator {
+                    ComparatorOperator::Equals => Ok(v == v1),
+                    ComparatorOperator::GreaterThan => Ok(v < v1),
+                    ComparatorOperator::LessThan => Ok(v > v1),
+                    ComparatorOperator::GreaterThanEquals => Ok(v <= v1),
+                    ComparatorOperator::LessThanEquals => Ok(v >= v1),
+                },
+                (Ok(_), Err(e)) => Err(e),
+                (Err(e), Ok(_)) => Err(e),
+                (Err(e), Err(_)) => Err(e),
+            };
         match args.2.len() == 0 {
             true => match init {
                 Ok(v) => match result_type {
@@ -620,7 +661,7 @@ impl TextComparatorExpression {
             false => {
                 let evaluated_args: Vec<Result<String, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| val.get_text())
+                    .map(|val| val.get_text(symbols))
                     .collect();
                 let result: Result<bool, CustomError> = evaluated_args
                     .iter()
@@ -653,8 +694,8 @@ impl TextComparatorExpression {
 }
 
 impl ToText for TextComparatorExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text, symbols)? {
             ComparatorResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -662,8 +703,8 @@ impl ToText for TextComparatorExpression {
 }
 
 impl ToBoolean for TextComparatorExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean)? {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean, symbols)? {
             ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -711,20 +752,25 @@ enum LogicalBinaryExpression {
 }
 
 impl LogicalBinaryExpression {
-    fn eval(&self, result_type: LogicalResultType) -> Result<LogicalResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: LogicalResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<LogicalResult, CustomError> {
         let (args, operator) = match self {
             LogicalBinaryExpression::And(v) => (v, LogicalBinaryOperator::And),
             LogicalBinaryExpression::Or(v) => (v, LogicalBinaryOperator::Or),
         };
-        let init: Result<bool, CustomError> = match (args.0.get_boolean(), args.1.get_boolean()) {
-            (Ok(v), Ok(v1)) => match operator {
-                LogicalBinaryOperator::And => Ok(v && v1),
-                LogicalBinaryOperator::Or => Ok(v || v1),
-            },
-            (Ok(_), Err(e)) => Err(e),
-            (Err(e), Ok(_)) => Err(e),
-            (Err(e), Err(_)) => Err(e),
-        };
+        let init: Result<bool, CustomError> =
+            match (args.0.get_boolean(symbols), args.1.get_boolean(symbols)) {
+                (Ok(v), Ok(v1)) => match operator {
+                    LogicalBinaryOperator::And => Ok(v && v1),
+                    LogicalBinaryOperator::Or => Ok(v || v1),
+                },
+                (Ok(_), Err(e)) => Err(e),
+                (Err(e), Ok(_)) => Err(e),
+                (Err(e), Err(_)) => Err(e),
+            };
         match args.2.len() == 0 {
             true => match init {
                 Ok(v) => match result_type {
@@ -736,7 +782,7 @@ impl LogicalBinaryExpression {
             false => {
                 let evaluated_args: Vec<Result<bool, CustomError>> = std::iter::once(&args.1)
                     .chain(&args.2)
-                    .map(|val| val.get_boolean())
+                    .map(|val| val.get_boolean(symbols))
                     .collect();
                 let result: Result<bool, CustomError> =
                     evaluated_args.iter().fold(init, |acc, val| match &acc {
@@ -762,8 +808,8 @@ impl LogicalBinaryExpression {
 }
 
 impl ToText for LogicalBinaryExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(LogicalResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(LogicalResultType::Text, symbols)? {
             LogicalResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -771,8 +817,8 @@ impl ToText for LogicalBinaryExpression {
 }
 
 impl ToBoolean for LogicalBinaryExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(LogicalResultType::Boolean)? {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(LogicalResultType::Boolean, symbols)? {
             LogicalResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -792,11 +838,15 @@ enum LogicalUnaryExpression {
 }
 
 impl LogicalUnaryExpression {
-    fn eval(&self, result_type: LogicalResultType) -> Result<LogicalResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: LogicalResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<LogicalResult, CustomError> {
         let (args, _operator) = match self {
             LogicalUnaryExpression::Not(v) => (v, LogicalUnaryOperator::Not),
         };
-        let result: Result<bool, CustomError> = match args.get_boolean() {
+        let result: Result<bool, CustomError> = match args.get_boolean(symbols) {
             Ok(v) => Ok(!v),
             Err(e) => Err(e),
         };
@@ -811,8 +861,8 @@ impl LogicalUnaryExpression {
 }
 
 impl ToText for LogicalUnaryExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(LogicalResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(LogicalResultType::Text, symbols)? {
             LogicalResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -820,8 +870,8 @@ impl ToText for LogicalUnaryExpression {
 }
 
 impl ToBoolean for LogicalUnaryExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(LogicalResultType::Boolean)? {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(LogicalResultType::Boolean, symbols)? {
             LogicalResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -876,65 +926,65 @@ enum NumberMatchExpression {
 }
 
 impl NumberMatchExpression {
-    fn eval(&self, result_type: NumberMatchResultType) -> Result<NumberMatchResult, CustomError> {
+    fn eval(&self, result_type: NumberMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<NumberMatchResult, CustomError> {
         let result: Result<i32, CustomError> = match self {
             NumberMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_number() {
+                match condition.get_number(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                        .fold(otherwise, |acc, val| match val.0.get_number(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_number(),
+                        .get_number(symbols),
                     Err(e) => Err(e),
                 }
             }
             NumberMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_decimal() {
+                match condition.get_decimal(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                        .fold(otherwise, |acc, val| match val.0.get_decimal(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_number(),
+                        .get_number(symbols),
                     Err(e) => Err(e),
                 }
             }
             NumberMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_text() {
+                match condition.get_text(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                        .fold(otherwise, |acc, val| match val.0.get_text(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_number(),
+                        .get_number(symbols),
                     Err(e) => Err(e),
                 }
             }
             NumberMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_boolean() {
+                match condition.get_boolean(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                        .fold(otherwise, |acc, val| match val.0.get_boolean(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_number(),
+                        .get_number(symbols),
                     Err(e) => Err(e),
                 }
             }
@@ -954,8 +1004,8 @@ impl NumberMatchExpression {
 }
 
 impl ToNumber for NumberMatchExpression {
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(NumberMatchResultType::Number)? {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(NumberMatchResultType::Number, symbols)? {
             NumberMatchResult::Number(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -963,8 +1013,8 @@ impl ToNumber for NumberMatchExpression {
 }
 
 impl ToDecimal for NumberMatchExpression {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(NumberMatchResultType::Decimal)? {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        match self.eval(NumberMatchResultType::Decimal, symbols)? {
             NumberMatchResult::Decimal(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -972,8 +1022,8 @@ impl ToDecimal for NumberMatchExpression {
 }
 
 impl ToText for NumberMatchExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(NumberMatchResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(NumberMatchResultType::Text, symbols)? {
             NumberMatchResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -1028,65 +1078,65 @@ enum DecimalMatchExpression {
 }
 
 impl DecimalMatchExpression {
-    fn eval(&self, result_type: DecimalMatchResultType) -> Result<DecimalMatchResult, CustomError> {
+    fn eval(&self, result_type: DecimalMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<DecimalMatchResult, CustomError> {
         let result: Result<BigDecimal, CustomError> = match self {
             DecimalMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_number() {
+                match condition.get_number(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                        .fold(otherwise, |acc, val| match val.0.get_number(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_decimal(),
+                        .get_decimal(symbols),
                     Err(e) => Err(e),
                 }
             }
             DecimalMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_decimal() {
+                match condition.get_decimal(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                        .fold(otherwise, |acc, val| match val.0.get_decimal(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_decimal(),
+                        .get_decimal(symbols),
                     Err(e) => Err(e),
                 }
             }
             DecimalMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_text() {
+                match condition.get_text(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                        .fold(otherwise, |acc, val| match val.0.get_text(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_decimal(),
+                        .get_decimal(symbols),
                     Err(e) => Err(e),
                 }
             }
             DecimalMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_boolean() {
+                match condition.get_boolean(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                        .fold(otherwise, |acc, val| match val.0.get_boolean(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_decimal(),
+                        .get_decimal(symbols),
                     Err(e) => Err(e),
                 }
             }
@@ -1106,8 +1156,8 @@ impl DecimalMatchExpression {
 }
 
 impl ToNumber for DecimalMatchExpression {
-    fn get_number(&self) -> Result<i32, CustomError> {
-        match self.eval(DecimalMatchResultType::Number)? {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(DecimalMatchResultType::Number, symbols)? {
             DecimalMatchResult::Number(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -1115,8 +1165,8 @@ impl ToNumber for DecimalMatchExpression {
 }
 
 impl ToDecimal for DecimalMatchExpression {
-    fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
-        match self.eval(DecimalMatchResultType::Decimal)? {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        match self.eval(DecimalMatchResultType::Decimal, symbols)? {
             DecimalMatchResult::Decimal(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -1124,8 +1174,8 @@ impl ToDecimal for DecimalMatchExpression {
 }
 
 impl ToText for DecimalMatchExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(DecimalMatchResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(DecimalMatchResultType::Text, symbols)? {
             DecimalMatchResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -1176,65 +1226,65 @@ enum TextMatchExpression {
 }
 
 impl TextMatchExpression {
-    fn eval(&self, result_type: TextMatchResultType) -> Result<TextMatchResult, CustomError> {
+    fn eval(&self, result_type: TextMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<TextMatchResult, CustomError> {
         let result: Result<String, CustomError> = match self {
             TextMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_number() {
+                match condition.get_number(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                        .fold(otherwise, |acc, val| match val.0.get_number(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_text(),
+                        .get_text(symbols),
                     Err(e) => Err(e),
                 }
             }
             TextMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_decimal() {
+                match condition.get_decimal(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                        .fold(otherwise, |acc, val| match val.0.get_decimal(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_text(),
+                        .get_text(symbols),
                     Err(e) => Err(e),
                 }
             }
             TextMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_text() {
+                match condition.get_text(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                        .fold(otherwise, |acc, val| match val.0.get_text(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_text(),
+                        .get_text(symbols),
                     Err(e) => Err(e),
                 }
             }
             TextMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_boolean() {
+                match condition.get_boolean(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                        .fold(otherwise, |acc, val| match val.0.get_boolean(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_text(),
+                        .get_text(symbols),
                     Err(e) => Err(e),
                 }
             }
@@ -1249,8 +1299,8 @@ impl TextMatchExpression {
 }
 
 impl ToText for TextMatchExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(TextMatchResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(TextMatchResultType::Text, symbols)? {
             TextMatchResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -1303,65 +1353,65 @@ enum BooleanMatchExpression {
 }
 
 impl BooleanMatchExpression {
-    fn eval(&self, result_type: BooleanMatchResultType) -> Result<BooleanMatchResult, CustomError> {
+    fn eval(&self, result_type: BooleanMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<BooleanMatchResult, CustomError> {
         let result: Result<bool, CustomError> = match self {
             BooleanMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_number() {
+                match condition.get_number(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_number() {
+                        .fold(otherwise, |acc, val| match val.0.get_number(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_boolean(),
+                        .get_boolean(symbols),
                     Err(e) => Err(e),
                 }
             }
             BooleanMatchExpression::DecimalConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_decimal() {
+                match condition.get_decimal(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_decimal() {
+                        .fold(otherwise, |acc, val| match val.0.get_decimal(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_boolean(),
+                        .get_boolean(symbols),
                     Err(e) => Err(e),
                 }
             }
             BooleanMatchExpression::TextConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_text() {
+                match condition.get_text(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_text() {
+                        .fold(otherwise, |acc, val| match val.0.get_text(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_boolean(),
+                        .get_boolean(symbols),
                     Err(e) => Err(e),
                 }
             }
             BooleanMatchExpression::BooleanConditionExpression((condition, guards, otherwise)) => {
-                match condition.get_boolean() {
+                match condition.get_boolean(symbols) {
                     Ok(v) => guards
                         .iter()
-                        .fold(otherwise, |acc, val| match val.0.get_boolean() {
+                        .fold(otherwise, |acc, val| match val.0.get_boolean(symbols) {
                             Ok(v1) => match v == v1 {
                                 true => &val.1,
                                 false => acc,
                             },
                             Err(_) => acc,
                         })
-                        .get_boolean(),
+                        .get_boolean(symbols),
                     Err(e) => Err(e),
                 }
             }
@@ -1377,8 +1427,8 @@ impl BooleanMatchExpression {
 }
 
 impl ToBoolean for BooleanMatchExpression {
-    fn get_boolean(&self) -> Result<bool, CustomError> {
-        match self.eval(BooleanMatchResultType::Text)? {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(BooleanMatchResultType::Text, symbols)? {
             BooleanMatchResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
@@ -1386,9 +1436,85 @@ impl ToBoolean for BooleanMatchExpression {
 }
 
 impl ToText for BooleanMatchExpression {
-    fn get_text(&self) -> Result<String, CustomError> {
-        match self.eval(BooleanMatchResultType::Text)? {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(BooleanMatchResultType::Text, symbols)? {
             BooleanMatchResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
+        }
+    }
+}
+
+// DOT OPERATOR
+
+#[derive(Debug)]
+enum DotResult {
+    Number(i32),
+    Decimal(BigDecimal),
+    Boolean(bool),
+    Text(String),
+}
+
+struct DotExpression {
+    path: Vec<String>,
+}
+
+impl DotExpression {
+    fn eval(&self, symbols: &HashMap<String, Symbol>) -> Result<DotResult, CustomError> {
+        let init: (Result<&Leaf, CustomError>, &HashMap<String, Symbol>) =
+            (Err(CustomError::Message(Strings::MissingSymbol)), &symbols);
+        let result: (Result<&Leaf, CustomError>, &HashMap<String, Symbol>) =
+            self.path
+                .iter()
+                .fold(init, |acc, val| match &acc.1.get(val) {
+                    Some(v) => match v {
+                        Symbol::Leaf(v1) => (Ok(v1), &symbols),
+                        Symbol::Symbols(v1) => (Err(CustomError::Message(Strings::MissingSymbol)), v1),
+                    },
+                    None => (Err(CustomError::Message(Strings::MissingSymbol)), &symbols),
+                });
+        match result.0 {
+            Ok(v) => match v {
+                Leaf::Number(v1) => Ok(DotResult::Number(*v1)),
+                Leaf::Decimal(v1) => Ok(DotResult::Decimal(v1.clone())),
+                Leaf::Text(v1) => Ok(DotResult::Text(v1.to_string())),
+                Leaf::Boolean(v1) => Ok(DotResult::Boolean(*v1)),
+            },
+            Err(e) => Err(e),
+        }
+    }
+}
+
+impl ToNumber for DotExpression {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(symbols)? {
+            DotResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
+        }
+    }
+}
+
+impl ToDecimal for DotExpression {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        match self.eval(symbols)? {
+            DotResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
+        }
+    }
+}
+
+impl ToText for DotExpression {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(symbols)? {
+            DotResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
+        }
+    }
+}
+
+impl ToBoolean for DotExpression {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(symbols)? {
+            DotResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
@@ -1401,6 +1527,8 @@ fn main() {
     //     "My favorite book.".to_string(),
     // );
 
+    let symbols: HashMap<String, Symbol> = HashMap::new();
+
     let expr1 = DecimalArithmeticExpression::Add((
         Box::new(BigDecimal::from_i32(3).unwrap()),
         vec![Box::new(BigDecimal::from_i32(141).unwrap())],
@@ -1410,8 +1538,8 @@ fn main() {
         vec![Box::new(BigDecimal::from_i32(12).unwrap())],
     ));
 
-    println!("expr1: {:?}", expr1.get_decimal().unwrap());
-    println!("expr2: {:?}", expr2.get_decimal().unwrap());
+    println!("expr1: {:?}", expr1.get_decimal(&symbols).unwrap());
+    println!("expr2: {:?}", expr2.get_decimal(&symbols).unwrap());
 
     let expr3 = NumberComparatorExpression::GreaterThanEquals((
         Box::new(12),
@@ -1425,22 +1553,22 @@ fn main() {
         vec![Box::new(BigDecimal::from_str("3.3").unwrap())],
     ));
 
-    println!("expr3: {:?}", &expr3.get_boolean().unwrap());
-    println!("expr4 {:?}", &expr4.get_boolean().unwrap());
+    println!("expr3: {:?}", &expr3.get_boolean(&symbols).unwrap());
+    println!("expr4 {:?}", &expr4.get_boolean(&symbols).unwrap());
 
     let expr5 = DecimalArithmeticExpression::Add((
         Box::new(BigDecimal::from_i32(3).unwrap()),
         vec![Box::new(BigDecimal::from_i32(4).unwrap())],
     ));
 
-    println!("expr5: {:?}", &expr5.get_text().unwrap());
+    println!("expr5: {:?}", &expr5.get_text(&symbols).unwrap());
 
     let expr6 = TextMatchExpression::NumberConditionExpression((
         Box::new(expr1),
         vec![(Box::new(expr2), Box::new(expr4))],
         Box::new(expr5),
     ));
-    println!("expr6: {:?}", &expr6.get_text().unwrap());
+    println!("expr6: {:?}", &expr6.get_text(&symbols).unwrap());
 }
 
 // #[cfg(test)]
