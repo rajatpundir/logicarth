@@ -5,11 +5,10 @@
  */
 
 // Notes.
-// 3. Implement symbols
-// 4. Implement dot operator
-// 5. Add serde
-// 6. Write test cases and build some audio visual documentation
-// 7. Add diesel
+// 1. Write test cases
+// 2. Add serde
+// 3. Build some audio visual documentation
+// 4. Add Diesel
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
@@ -833,8 +832,8 @@ enum LogicalUnaryOperator {
 }
 
 #[derive(Debug)]
-enum LogicalUnaryExpression {
-    Not(Box<dyn ToBoolean>),
+struct LogicalUnaryExpression {
+    value: Box<dyn ToBoolean>,
 }
 
 impl LogicalUnaryExpression {
@@ -843,10 +842,7 @@ impl LogicalUnaryExpression {
         result_type: LogicalResultType,
         symbols: &HashMap<String, Symbol>,
     ) -> Result<LogicalResult, CustomError> {
-        let (args, _operator) = match self {
-            LogicalUnaryExpression::Not(v) => (v, LogicalUnaryOperator::Not),
-        };
-        let result: Result<bool, CustomError> = match args.get_boolean(symbols) {
+        let result: Result<bool, CustomError> = match self.value.get_boolean(symbols) {
             Ok(v) => Ok(!v),
             Err(e) => Err(e),
         };
@@ -926,7 +922,11 @@ enum NumberMatchExpression {
 }
 
 impl NumberMatchExpression {
-    fn eval(&self, result_type: NumberMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<NumberMatchResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: NumberMatchResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<NumberMatchResult, CustomError> {
         let result: Result<i32, CustomError> = match self {
             NumberMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
                 match condition.get_number(symbols) {
@@ -1078,7 +1078,11 @@ enum DecimalMatchExpression {
 }
 
 impl DecimalMatchExpression {
-    fn eval(&self, result_type: DecimalMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<DecimalMatchResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: DecimalMatchResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<DecimalMatchResult, CustomError> {
         let result: Result<BigDecimal, CustomError> = match self {
             DecimalMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
                 match condition.get_number(symbols) {
@@ -1226,7 +1230,11 @@ enum TextMatchExpression {
 }
 
 impl TextMatchExpression {
-    fn eval(&self, result_type: TextMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<TextMatchResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: TextMatchResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<TextMatchResult, CustomError> {
         let result: Result<String, CustomError> = match self {
             TextMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
                 match condition.get_number(symbols) {
@@ -1353,7 +1361,11 @@ enum BooleanMatchExpression {
 }
 
 impl BooleanMatchExpression {
-    fn eval(&self, result_type: BooleanMatchResultType, symbols: &HashMap<String, Symbol>) -> Result<BooleanMatchResult, CustomError> {
+    fn eval(
+        &self,
+        result_type: BooleanMatchResultType,
+        symbols: &HashMap<String, Symbol>,
+    ) -> Result<BooleanMatchResult, CustomError> {
         let result: Result<bool, CustomError> = match self {
             BooleanMatchExpression::NumberConditionExpression((condition, guards, otherwise)) => {
                 match condition.get_number(symbols) {
@@ -1468,7 +1480,9 @@ impl DotExpression {
                 .fold(init, |acc, val| match &acc.1.get(val) {
                     Some(v) => match v {
                         Symbol::Leaf(v1) => (Ok(v1), &symbols),
-                        Symbol::Symbols(v1) => (Err(CustomError::Message(Strings::MissingSymbol)), v1),
+                        Symbol::Symbols(v1) => {
+                            (Err(CustomError::Message(Strings::MissingSymbol)), v1)
+                        }
                     },
                     None => (Err(CustomError::Message(Strings::MissingSymbol)), &symbols),
                 });
