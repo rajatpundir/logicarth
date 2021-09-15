@@ -1,16 +1,15 @@
-/* Copyright (C) Logicarth (OPC) Private Limited - All Rights Reserved
+/* Copyright (C) Gokyun (OPC) Private Limited - All Rights Reserved
  * Unauthorized copying of this file, via any medium is strictly prohibited
  * Proprietary and confidential
  * Written by Rajat Pundir <rajatpundir13@gmail.com>, August 2021
  */
 
 // Notes.
-// Making invalid expressions syntactically invalid, probably by wrapping expressions of different result types into their own types
-// 1. Do Internationalization
-// 2. Identity op may no longer be necessary, since constants can be plugged right in by wrapping them in a box. Concat can be implemented later, regex may not be necessary.
 // 3. Implement symbols
 // 4. Implement dot operator
-// 5. Write test cases and build some audio visual documentation
+// 5. Add serde
+// 6. Write test cases and build some audio visual documentation
+// 7. Add diesel
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
@@ -18,11 +17,30 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::vec;
 
-const UNEXPECTED_ERROR: &str = "Unexpected Error";
+#[derive(Debug)]
+enum Language {
+    English,
+}
+
+#[derive(Debug, Clone)]
+enum Strings {
+    UnexpectedError,
+}
+
+impl Strings {
+    fn to_string(&self, lang: Language) -> String {
+        let result: &str = match self {
+            Strings::UnexpectedError => match lang {
+                Language::English => "Unexpected Error",
+            },
+        };
+        result.to_string()
+    }
+}
 
 #[derive(Debug, Clone)]
 enum CustomError {
-    Message(String),
+    Message(Strings),
     Messages(HashMap<String, CustomError>),
 }
 
@@ -48,7 +66,7 @@ impl ToNumber for BigDecimal {
     fn get_number(&self) -> Result<i32, CustomError> {
         match self.to_i32() {
             Some(v) => Ok(v),
-            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+            None => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -67,7 +85,7 @@ impl ToDecimal for i32 {
     fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
         match BigDecimal::from_i32(*self) {
             Some(v) => Ok(v),
-            None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+            None => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -192,7 +210,7 @@ impl NumberArithmeticExpression {
                 ArithmeticResultType::Number => Ok(ArithmeticResult::Number(v)),
                 ArithmeticResultType::Decimal => match BigDecimal::from_i32(v) {
                     Some(v1) => Ok(ArithmeticResult::Decimal(v1)),
-                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    None => Err(CustomError::Message(Strings::UnexpectedError)),
                 },
                 ArithmeticResultType::Text => Ok(ArithmeticResult::Text(v.to_string())),
             },
@@ -205,7 +223,7 @@ impl ToNumber for NumberArithmeticExpression {
     fn get_number(&self) -> Result<i32, CustomError> {
         match self.eval(ArithmeticResultType::Number)? {
             ArithmeticResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -214,7 +232,7 @@ impl ToDecimal for NumberArithmeticExpression {
     fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
         match self.eval(ArithmeticResultType::Decimal)? {
             ArithmeticResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -223,7 +241,7 @@ impl ToText for NumberArithmeticExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(ArithmeticResultType::Text)? {
             ArithmeticResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -267,7 +285,7 @@ impl DecimalArithmeticExpression {
             ArithmeticResultType::Number => match result {
                 Ok(v) => match v.to_i32() {
                     Some(v1) => Ok(ArithmeticResult::Number(v1)),
-                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    None => Err(CustomError::Message(Strings::UnexpectedError)),
                 },
                 Err(e) => Err(e),
             },
@@ -287,7 +305,7 @@ impl ToNumber for DecimalArithmeticExpression {
     fn get_number(&self) -> Result<i32, CustomError> {
         match self.eval(ArithmeticResultType::Number)? {
             ArithmeticResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -296,7 +314,7 @@ impl ToDecimal for DecimalArithmeticExpression {
     fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
         match self.eval(ArithmeticResultType::Decimal)? {
             ArithmeticResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -305,7 +323,7 @@ impl ToText for DecimalArithmeticExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(ArithmeticResultType::Text)? {
             ArithmeticResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -416,7 +434,7 @@ impl ToText for NumberComparatorExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(ComparatorResultType::Text)? {
             ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -425,7 +443,7 @@ impl ToBoolean for NumberComparatorExpression {
     fn get_boolean(&self) -> Result<bool, CustomError> {
         match self.eval(ComparatorResultType::Boolean)? {
             ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -543,7 +561,7 @@ impl ToText for DecimalComparatorExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(ComparatorResultType::Text)? {
             ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -552,7 +570,7 @@ impl ToBoolean for DecimalComparatorExpression {
     fn get_boolean(&self) -> Result<bool, CustomError> {
         match self.eval(ComparatorResultType::Boolean)? {
             ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -638,7 +656,7 @@ impl ToText for TextComparatorExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(ComparatorResultType::Text)? {
             ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -647,7 +665,7 @@ impl ToBoolean for TextComparatorExpression {
     fn get_boolean(&self) -> Result<bool, CustomError> {
         match self.eval(ComparatorResultType::Boolean)? {
             ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -747,7 +765,7 @@ impl ToText for LogicalBinaryExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(LogicalResultType::Text)? {
             LogicalResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -756,7 +774,7 @@ impl ToBoolean for LogicalBinaryExpression {
     fn get_boolean(&self) -> Result<bool, CustomError> {
         match self.eval(LogicalResultType::Boolean)? {
             LogicalResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -796,7 +814,7 @@ impl ToText for LogicalUnaryExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(LogicalResultType::Text)? {
             LogicalResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -805,7 +823,7 @@ impl ToBoolean for LogicalUnaryExpression {
     fn get_boolean(&self) -> Result<bool, CustomError> {
         match self.eval(LogicalResultType::Boolean)? {
             LogicalResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -926,7 +944,7 @@ impl NumberMatchExpression {
                 NumberMatchResultType::Number => Ok(NumberMatchResult::Number(v)),
                 NumberMatchResultType::Decimal => match BigDecimal::from_i32(v) {
                     Some(v1) => Ok(NumberMatchResult::Decimal(v1)),
-                    None => Err(CustomError::Message(UNEXPECTED_ERROR.to_string())),
+                    None => Err(CustomError::Message(Strings::UnexpectedError)),
                 },
                 NumberMatchResultType::Text => Ok(NumberMatchResult::Text(v.to_string())),
             },
@@ -939,7 +957,7 @@ impl ToNumber for NumberMatchExpression {
     fn get_number(&self) -> Result<i32, CustomError> {
         match self.eval(NumberMatchResultType::Number)? {
             NumberMatchResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -948,7 +966,7 @@ impl ToDecimal for NumberMatchExpression {
     fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
         match self.eval(NumberMatchResultType::Decimal)? {
             NumberMatchResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -957,7 +975,7 @@ impl ToText for NumberMatchExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(NumberMatchResultType::Text)? {
             NumberMatchResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -1077,7 +1095,7 @@ impl DecimalMatchExpression {
             Ok(v) => match result_type {
                 DecimalMatchResultType::Number => match v.to_i32() {
                     Some(v1) => Ok(DecimalMatchResult::Number(v1)),
-                    None => Err(CustomError::Message("Unexpected Result".to_string())),
+                    None => Err(CustomError::Message(Strings::UnexpectedError)),
                 },
                 DecimalMatchResultType::Decimal => Ok(DecimalMatchResult::Decimal(v)),
                 DecimalMatchResultType::Text => Ok(DecimalMatchResult::Text(v.to_string())),
@@ -1091,7 +1109,7 @@ impl ToNumber for DecimalMatchExpression {
     fn get_number(&self) -> Result<i32, CustomError> {
         match self.eval(DecimalMatchResultType::Number)? {
             DecimalMatchResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -1100,7 +1118,7 @@ impl ToDecimal for DecimalMatchExpression {
     fn get_decimal(&self) -> Result<BigDecimal, CustomError> {
         match self.eval(DecimalMatchResultType::Decimal)? {
             DecimalMatchResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -1109,7 +1127,7 @@ impl ToText for DecimalMatchExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(DecimalMatchResultType::Text)? {
             DecimalMatchResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -1234,7 +1252,7 @@ impl ToText for TextMatchExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(TextMatchResultType::Text)? {
             TextMatchResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -1362,7 +1380,7 @@ impl ToBoolean for BooleanMatchExpression {
     fn get_boolean(&self) -> Result<bool, CustomError> {
         match self.eval(BooleanMatchResultType::Text)? {
             BooleanMatchResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
@@ -1371,12 +1389,11 @@ impl ToText for BooleanMatchExpression {
     fn get_text(&self) -> Result<String, CustomError> {
         match self.eval(BooleanMatchResultType::Text)? {
             BooleanMatchResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message("Unexpected Result".to_string())),
+            _ => Err(CustomError::Message(Strings::UnexpectedError)),
         }
     }
 }
 
-// And diesel stuff
 fn main() {
     // let mut book_reviews = HashMap::new();
     // book_reviews.insert(
