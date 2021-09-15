@@ -100,11 +100,11 @@ enum NumberArithmeticArg {
 
 #[derive(Debug)]
 enum NumberArithmeticExpression {
-    Add(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
-    Multiply(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
-    Subtract(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
-    Divide(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
-    Modulus(Box<(NumberArithmeticArg, Vec<NumberArithmeticArg>)>),
+    Add((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
+    Multiply((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
+    Subtract((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
+    Divide((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
+    Modulus((NumberArithmeticArg, Vec<NumberArithmeticArg>)),
 }
 
 impl NumberArithmeticExpression {
@@ -194,11 +194,11 @@ enum DecimalArithmeticArg {
 
 #[derive(Debug)]
 enum DecimalArithmeticExpression {
-    Add(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
-    Multiply(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
-    Subtract(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
-    Divide(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
-    Modulus(Box<(DecimalArithmeticArg, Vec<DecimalArithmeticArg>)>),
+    Add((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
+    Multiply((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
+    Subtract((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
+    Divide((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
+    Modulus((DecimalArithmeticArg, Vec<DecimalArithmeticArg>)),
 }
 
 impl DecimalArithmeticExpression {
@@ -342,39 +342,39 @@ enum NumberComparatorArg {
 #[derive(Debug)]
 enum NumberComparatorExpression {
     Equals(
-        Box<(
+        (
             NumberComparatorArg,
             NumberComparatorArg,
             Vec<NumberComparatorArg>,
-        )>,
+        ),
     ),
     GreaterThan(
-        Box<(
+        (
             NumberComparatorArg,
             NumberComparatorArg,
             Vec<NumberComparatorArg>,
-        )>,
+        ),
     ),
     LessThan(
-        Box<(
+        (
             NumberComparatorArg,
             NumberComparatorArg,
             Vec<NumberComparatorArg>,
-        )>,
+        ),
     ),
     GreaterThanEquals(
-        Box<(
+        (
             NumberComparatorArg,
             NumberComparatorArg,
             Vec<NumberComparatorArg>,
-        )>,
+        ),
     ),
     LessThanEquals(
-        Box<(
+        (
             NumberComparatorArg,
             NumberComparatorArg,
             Vec<NumberComparatorArg>,
-        )>,
+        ),
     ),
 }
 
@@ -487,39 +487,39 @@ enum DecimalComparatorArg {
 #[derive(Debug)]
 enum DecimalComparatorExpression {
     Equals(
-        Box<(
+        (
             DecimalComparatorArg,
             DecimalComparatorArg,
             Vec<DecimalComparatorArg>,
-        )>,
+        ),
     ),
     GreaterThan(
-        Box<(
+        (
             DecimalComparatorArg,
             DecimalComparatorArg,
             Vec<DecimalComparatorArg>,
-        )>,
+        ),
     ),
     LessThan(
-        Box<(
+        (
             DecimalComparatorArg,
             DecimalComparatorArg,
             Vec<DecimalComparatorArg>,
-        )>,
+        ),
     ),
     GreaterThanEquals(
-        Box<(
+        (
             DecimalComparatorArg,
             DecimalComparatorArg,
             Vec<DecimalComparatorArg>,
-        )>,
+        ),
     ),
     LessThanEquals(
-        Box<(
+        (
             DecimalComparatorArg,
             DecimalComparatorArg,
             Vec<DecimalComparatorArg>,
-        )>,
+        ),
     ),
 }
 
@@ -643,11 +643,11 @@ enum TextComparatorArg {
 
 #[derive(Debug)]
 enum TextComparatorExpression {
-    Equals(Box<(TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)>),
-    GreaterThan(Box<(TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)>),
-    LessThan(Box<(TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)>),
-    GreaterThanEquals(Box<(TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)>),
-    LessThanEquals(Box<(TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)>),
+    Equals((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
+    GreaterThan((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
+    LessThan((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
+    GreaterThanEquals((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
+    LessThanEquals((TextComparatorArg, TextComparatorArg, Vec<TextComparatorArg>)),
 }
 
 impl TextComparatorExpression {
@@ -779,18 +779,18 @@ enum LogicalBinaryOperator {
 #[derive(Debug)]
 enum LogicalBinaryExpression {
     And(
-        Box<(
+        (
             LogicalOperatorArg,
             LogicalOperatorArg,
             Vec<LogicalOperatorArg>,
-        )>,
+        ),
     ),
     Or(
-        Box<(
+        (
             LogicalOperatorArg,
             LogicalOperatorArg,
             Vec<LogicalOperatorArg>,
-        )>,
+        ),
     ),
 }
 
@@ -883,7 +883,7 @@ enum LogicalUnaryOperator {
 
 #[derive(Debug)]
 enum LogicalUnaryExpression {
-    Not(Box<LogicalOperatorArg>),
+    Not(LogicalOperatorArg),
 }
 
 impl LogicalUnaryExpression {
@@ -891,7 +891,7 @@ impl LogicalUnaryExpression {
         let (args, _operator) = match self {
             LogicalUnaryExpression::Not(v) => (v, LogicalUnaryOperator::Not),
         };
-        let result: Result<bool, CustomError> = match args.as_ref() {
+        let result: Result<bool, CustomError> = match args {
             LogicalOperatorArg::Boolean(v) => Ok(*v),
             LogicalOperatorArg::Expression(v) => v.get_boolean(),
         };
@@ -1612,35 +1612,35 @@ fn main() {
     //     "Adventures of Huckleberry Finn".to_string(),
     //     "My favorite book.".to_string(),
     // );
-    let expr1 = DecimalArithmeticExpression::Add(Box::new((
+    let expr1 = DecimalArithmeticExpression::Add((
         DecimalArithmeticArg::Decimal(BigDecimal::from_i32(3).unwrap()),
         vec![DecimalArithmeticArg::Decimal(
             BigDecimal::from_i32(4).unwrap(),
         )],
-    )));
-    let expr2 = DecimalArithmeticExpression::Multiply(Box::new((
+    ));
+    let expr2 = DecimalArithmeticExpression::Multiply((
         DecimalArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
         vec![
             DecimalArithmeticArg::Decimal(BigDecimal::from_i32(12).unwrap()),
             DecimalArithmeticArg::Expression(Box::new(expr1)),
         ],
-    )));
+    ));
 
     println!("{:?}", expr2.get_decimal().unwrap());
 
-    let expr3 = NumberComparatorExpression::GreaterThanEquals(Box::new((
+    let expr3 = NumberComparatorExpression::GreaterThanEquals((
         NumberComparatorArg::Number(12),
         NumberComparatorArg::Number(22),
         vec![NumberComparatorArg::Number(22)],
-    )));
+    ));
 
-    let expr4 = DecimalComparatorExpression::GreaterThanEquals(Box::new((
+    let expr4 = DecimalComparatorExpression::GreaterThanEquals((
         DecimalComparatorArg::Decimal(BigDecimal::from(2)),
         DecimalComparatorArg::Decimal(BigDecimal::from(3)),
         vec![DecimalComparatorArg::Decimal(
             BigDecimal::from_str("3.3").unwrap(),
         )],
-    )));
+    ));
 
     println!("{:?}", &expr3.get_boolean().unwrap());
     println!("{:?}", &expr4.get_boolean().unwrap());
