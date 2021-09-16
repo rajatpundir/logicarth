@@ -5,17 +5,13 @@
  */
 
 // Notes.
-// 1. Write test cases
-// 2. Add serde
-// 3. Build some audio visual documentation
-// 4. Add Diesel
+// 1. Add serde
+// 2. Build some audio visual documentation
+// 3. Add Diesel
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
 use std::collections::HashMap;
-use std::hash::Hash;
-use std::str::FromStr;
-use std::vec;
 
 #[derive(Debug)]
 enum Language {
