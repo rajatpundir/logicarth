@@ -49,7 +49,6 @@ enum Message {
     SymbolTypeDecimal,
     SymbolTypeText,
     SymbolTypeBoolean,
-    SymbolTypeNode,
 }
 
 impl Message {
@@ -66,7 +65,6 @@ impl Message {
                 Message::SymbolTypeDecimal => "Decimal",
                 Message::SymbolTypeText => "Text",
                 Message::SymbolTypeBoolean => "Boolean",
-                Message::SymbolTypeNode => "node",
             },
         };
         result.to_string()
@@ -184,6 +182,7 @@ impl JsonSerializable for Symbol {
 
 trait ToNumber {
     fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError>;
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
 }
 
 impl Debug for dyn ToNumber {
@@ -196,6 +195,10 @@ impl ToNumber for i32 {
     fn get_number(&self, _symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
         Ok(*self)
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        Ok(json!(self))
+    }
 }
 
 impl ToNumber for BigDecimal {
@@ -205,10 +208,18 @@ impl ToNumber for BigDecimal {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        match self.to_i32() {
+            Some(v) => Ok(json!(v)),
+            None => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 trait ToDecimal {
     fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError>;
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
 }
 
 impl Debug for dyn ToDecimal {
@@ -224,16 +235,34 @@ impl ToDecimal for i32 {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        match BigDecimal::from_i32(*self) {
+            Some(v) => match v.to_f64() {
+                Some(v1) => Ok(json!(v1)),
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            None => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 impl ToDecimal for BigDecimal {
     fn get_decimal(&self, _symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
         Ok(self.clone())
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        match self.to_f64() {
+            Some(v) => Ok(json!(v)),
+            None => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 trait ToText {
     fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError>;
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
 }
 
 impl Debug for dyn ToText {
@@ -246,11 +275,19 @@ impl ToText for i32 {
     fn get_text(&self, _symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        Ok(json!(self.to_string()))
+    }
 }
 
 impl ToText for BigDecimal {
     fn get_text(&self, _symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        Ok(json!(self.to_string()))
     }
 }
 
@@ -258,16 +295,25 @@ impl ToText for String {
     fn get_text(&self, _symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        Ok(json!(self.to_string()))
+    }
 }
 
 impl ToText for bool {
     fn get_text(&self, _symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         Ok(self.to_string())
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        Ok(json!(self.to_string()))
+    }
 }
 
 trait ToBoolean {
     fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError>;
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
 }
 
 impl Debug for dyn ToBoolean {
@@ -279,6 +325,10 @@ impl Debug for dyn ToBoolean {
 impl ToBoolean for bool {
     fn get_boolean(&self, _symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
         Ok(*self)
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        Ok(json!(self))
     }
 }
 
@@ -366,6 +416,52 @@ impl ToNumber for NumberArithmeticExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        let operator: &str = match self {
+            NumberArithmeticExpression::Add(_) => "+",
+            NumberArithmeticExpression::Multiply(_) => "*",
+            NumberArithmeticExpression::Subtract(_) => "-",
+            NumberArithmeticExpression::Divide(_) => "/",
+            NumberArithmeticExpression::Modulus(_) => "%",
+        };
+        match self {
+            NumberArithmeticExpression::Add(v)
+            | NumberArithmeticExpression::Multiply(v)
+            | NumberArithmeticExpression::Subtract(v)
+            | NumberArithmeticExpression::Divide(v)
+            | NumberArithmeticExpression::Modulus(v) => {
+                let mut err: Option<CustomError> = None;
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
+                    .chain(v.1)
+                    .map(|val| match val.serialize(lang) {
+                        Ok(v) => Ok(v),
+                        Err(e) => {
+                            err = Some(e);
+                            Err(e)
+                        }
+                    })
+                    .collect();
+                match err {
+                    Some(e) => Err(e),
+                    None => {
+                        let args: Vec<Value> = result
+                            .iter()
+                            .map(|val| match val {
+                                Ok(v) => *v,
+                                Err(e) => panic!(),
+                            })
+                            .collect();
+                        Ok(json!({
+                            "op": operator,
+                            "type": "Number",
+                            "args": args
+                        }))
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl ToDecimal for NumberArithmeticExpression {
@@ -375,6 +471,10 @@ impl ToDecimal for NumberArithmeticExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToNumber).serialize(lang)
+    }
 }
 
 impl ToText for NumberArithmeticExpression {
@@ -383,6 +483,10 @@ impl ToText for NumberArithmeticExpression {
             ArithmeticResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToNumber).serialize(lang)
     }
 }
 
@@ -452,6 +556,10 @@ impl ToNumber for DecimalArithmeticExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToDecimal).serialize(lang)
+    }
 }
 
 impl ToDecimal for DecimalArithmeticExpression {
@@ -459,6 +567,52 @@ impl ToDecimal for DecimalArithmeticExpression {
         match self.eval(ArithmeticResultType::Decimal, symbols)? {
             ArithmeticResult::Decimal(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        let operator: &str = match self {
+            DecimalArithmeticExpression::Add(_) => "+",
+            DecimalArithmeticExpression::Multiply(_) => "*",
+            DecimalArithmeticExpression::Subtract(_) => "-",
+            DecimalArithmeticExpression::Divide(_) => "/",
+            DecimalArithmeticExpression::Modulus(_) => "%",
+        };
+        match self {
+            DecimalArithmeticExpression::Add(v)
+            | DecimalArithmeticExpression::Multiply(v)
+            | DecimalArithmeticExpression::Subtract(v)
+            | DecimalArithmeticExpression::Divide(v)
+            | DecimalArithmeticExpression::Modulus(v) => {
+                let mut err: Option<CustomError> = None;
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
+                    .chain(v.1)
+                    .map(|val| match val.serialize(lang) {
+                        Ok(v) => Ok(v),
+                        Err(e) => {
+                            err = Some(e);
+                            Err(e)
+                        }
+                    })
+                    .collect();
+                match err {
+                    Some(e) => Err(e),
+                    None => {
+                        let args: Vec<Value> = result
+                            .iter()
+                            .map(|val| match val {
+                                Ok(v) => *v,
+                                Err(e) => panic!(),
+                            })
+                            .collect();
+                        Ok(json!({
+                            "op": operator,
+                            "type": "Decimal",
+                            "args": args
+                        }))
+                    }
+                }
+            }
         }
     }
 }
@@ -469,6 +623,10 @@ impl ToText for DecimalArithmeticExpression {
             ArithmeticResult::Text(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToDecimal).serialize(lang)
     }
 }
 
@@ -586,6 +744,10 @@ impl ToText for NumberComparatorExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToBoolean).serialize(lang)
+    }
 }
 
 impl ToBoolean for NumberComparatorExpression {
@@ -593,6 +755,53 @@ impl ToBoolean for NumberComparatorExpression {
         match self.eval(ComparatorResultType::Boolean, symbols)? {
             ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        let operator: &str = match self {
+            NumberComparatorExpression::Equals(_) => "==",
+            NumberComparatorExpression::GreaterThanEquals(_) => ">=",
+            NumberComparatorExpression::LessThanEquals(_) => "<=",
+            NumberComparatorExpression::GreaterThan(_) => ">",
+            NumberComparatorExpression::LessThan(_) => "<",
+        };
+        match self {
+            NumberComparatorExpression::Equals(v)
+            | NumberComparatorExpression::GreaterThanEquals(v)
+            | NumberComparatorExpression::LessThanEquals(v)
+            | NumberComparatorExpression::GreaterThan(v)
+            | NumberComparatorExpression::LessThan(v) => {
+                let mut err: Option<CustomError> = None;
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
+                    .chain(std::iter::once(v.1))
+                    .chain(v.2)
+                    .map(|val| match val.serialize(lang) {
+                        Ok(v) => Ok(v),
+                        Err(e) => {
+                            err = Some(e);
+                            Err(e)
+                        }
+                    })
+                    .collect();
+                match err {
+                    Some(e) => Err(e),
+                    None => {
+                        let args: Vec<Value> = result
+                            .iter()
+                            .map(|val| match val {
+                                Ok(v) => *v,
+                                Err(e) => panic!(),
+                            })
+                            .collect();
+                        Ok(json!({
+                            "op": operator,
+                            "type": "Number",
+                            "args": args
+                        }))
+                    }
+                }
+            }
         }
     }
 }
@@ -718,6 +927,10 @@ impl ToText for DecimalComparatorExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToBoolean).serialize(lang)
+    }
 }
 
 impl ToBoolean for DecimalComparatorExpression {
@@ -725,6 +938,53 @@ impl ToBoolean for DecimalComparatorExpression {
         match self.eval(ComparatorResultType::Boolean, symbols)? {
             ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        let operator: &str = match self {
+            DecimalComparatorExpression::Equals(_) => "==",
+            DecimalComparatorExpression::GreaterThanEquals(_) => ">=",
+            DecimalComparatorExpression::LessThanEquals(_) => "<=",
+            DecimalComparatorExpression::GreaterThan(_) => ">",
+            DecimalComparatorExpression::LessThan(_) => "<",
+        };
+        match self {
+            DecimalComparatorExpression::Equals(v)
+            | DecimalComparatorExpression::GreaterThanEquals(v)
+            | DecimalComparatorExpression::LessThanEquals(v)
+            | DecimalComparatorExpression::GreaterThan(v)
+            | DecimalComparatorExpression::LessThan(v) => {
+                let mut err: Option<CustomError> = None;
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
+                    .chain(std::iter::once(v.1))
+                    .chain(v.2)
+                    .map(|val| match val.serialize(lang) {
+                        Ok(v) => Ok(v),
+                        Err(e) => {
+                            err = Some(e);
+                            Err(e)
+                        }
+                    })
+                    .collect();
+                match err {
+                    Some(e) => Err(e),
+                    None => {
+                        let args: Vec<Value> = result
+                            .iter()
+                            .map(|val| match val {
+                                Ok(v) => *v,
+                                Err(e) => panic!(),
+                            })
+                            .collect();
+                        Ok(json!({
+                            "op": operator,
+                            "type": "Decimal",
+                            "args": args
+                        }))
+                    }
+                }
+            }
         }
     }
 }
@@ -818,6 +1078,10 @@ impl ToText for TextComparatorExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToBoolean).serialize(lang)
+    }
 }
 
 impl ToBoolean for TextComparatorExpression {
@@ -825,6 +1089,53 @@ impl ToBoolean for TextComparatorExpression {
         match self.eval(ComparatorResultType::Boolean, symbols)? {
             ComparatorResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        let operator: &str = match self {
+            TextComparatorExpression::Equals(_) => "==",
+            TextComparatorExpression::GreaterThanEquals(_) => ">=",
+            TextComparatorExpression::LessThanEquals(_) => "<=",
+            TextComparatorExpression::GreaterThan(_) => ">",
+            TextComparatorExpression::LessThan(_) => "<",
+        };
+        match self {
+            TextComparatorExpression::Equals(v)
+            | TextComparatorExpression::GreaterThanEquals(v)
+            | TextComparatorExpression::LessThanEquals(v)
+            | TextComparatorExpression::GreaterThan(v)
+            | TextComparatorExpression::LessThan(v) => {
+                let mut err: Option<CustomError> = None;
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
+                    .chain(std::iter::once(v.1))
+                    .chain(v.2)
+                    .map(|val| match val.serialize(lang) {
+                        Ok(v) => Ok(v),
+                        Err(e) => {
+                            err = Some(e);
+                            Err(e)
+                        }
+                    })
+                    .collect();
+                match err {
+                    Some(e) => Err(e),
+                    None => {
+                        let args: Vec<Value> = result
+                            .iter()
+                            .map(|val| match val {
+                                Ok(v) => *v,
+                                Err(e) => panic!(),
+                            })
+                            .collect();
+                        Ok(json!({
+                            "op": operator,
+                            "type": "Text",
+                            "args": args
+                        }))
+                    }
+                }
+            }
         }
     }
 }
@@ -932,6 +1243,10 @@ impl ToText for LogicalBinaryExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToBoolean).serialize(lang)
+    }
 }
 
 impl ToBoolean for LogicalBinaryExpression {
@@ -939,6 +1254,46 @@ impl ToBoolean for LogicalBinaryExpression {
         match self.eval(LogicalResultType::Boolean, symbols)? {
             LogicalResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        let operator: &str = match self {
+            LogicalBinaryExpression::And(_) => "and",
+            LogicalBinaryExpression::Or(_) => "or",
+        };
+        match self {
+            LogicalBinaryExpression::And(v) | LogicalBinaryExpression::Or(v) => {
+                let mut err: Option<CustomError> = None;
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
+                    .chain(std::iter::once(v.1))
+                    .chain(v.2)
+                    .map(|val| match val.serialize(lang) {
+                        Ok(v) => Ok(v),
+                        Err(e) => {
+                            err = Some(e);
+                            Err(e)
+                        }
+                    })
+                    .collect();
+                match err {
+                    Some(e) => Err(e),
+                    None => {
+                        let args: Vec<Value> = result
+                            .iter()
+                            .map(|val| match val {
+                                Ok(v) => *v,
+                                Err(e) => panic!(),
+                            })
+                            .collect();
+                        Ok(json!({
+                            "op": operator,
+                            "type": "Boolean",
+                            "args": args
+                        }))
+                    }
+                }
+            }
         }
     }
 }
@@ -977,6 +1332,10 @@ impl ToText for LogicalUnaryExpression {
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToBoolean).serialize(lang)
+    }
 }
 
 impl ToBoolean for LogicalUnaryExpression {
@@ -984,6 +1343,17 @@ impl ToBoolean for LogicalUnaryExpression {
         match self.eval(LogicalResultType::Boolean, symbols)? {
             LogicalResult::Boolean(v) => Ok(v),
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        match self.value.serialize(lang) {
+            Ok(v) => Ok(json!({
+                "op": "not",
+                "type": "Boolean",
+                "args": v
+            })),
+            Err(e) => Err(e),
         }
     }
 }
