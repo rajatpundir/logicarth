@@ -21,16 +21,9 @@ trait JsonSerializable {
 }
 
 trait JsonDeserializable {
-    fn deserialize(&self) -> Result<Value, CustomError>;
-}
-
-impl JsonSerializable for BigDecimal {
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        match self.to_f64() {
-            Some(v) => Ok(v.into()),
-            None => Err(CustomError::Message(Message::ErrSerialization)),
-        }
-    }
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized;
 }
 
 #[derive(Debug)]
@@ -114,7 +107,7 @@ impl JsonSerializable for Leaf {
             })),
             Leaf::Decimal(v) => Ok(json!({
                 "type": "Decimal",
-                "value": v.serialize(lang)?
+                "value": (v as &dyn ToDecimal).serialize(lang)?
             })),
             Leaf::Text(v) => Ok(json!({
                 "type": "Text",
@@ -162,7 +155,7 @@ impl<V: JsonSerializable> JsonSerializable for HashMap<String, V> {
 
 impl JsonSerializable for Symbol {
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let value: Result<Value, CustomError> = match self.value {
+        let value: Result<Value, CustomError> = match &self.value {
             Some(v) => v.serialize(lang),
             None => Ok(Value::Null),
         };
@@ -197,7 +190,7 @@ impl ToNumber for i32 {
         Ok(*self)
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self))
     }
 }
@@ -210,7 +203,7 @@ impl ToNumber for BigDecimal {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         match self.to_i32() {
             Some(v) => Ok(json!(v)),
             None => Err(CustomError::Message(Message::ErrUnexpected)),
@@ -237,7 +230,7 @@ impl ToDecimal for i32 {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         match BigDecimal::from_i32(*self) {
             Some(v) => match v.to_f64() {
                 Some(v1) => Ok(json!(v1)),
@@ -253,7 +246,7 @@ impl ToDecimal for BigDecimal {
         Ok(self.clone())
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         match self.to_f64() {
             Some(v) => Ok(json!(v)),
             None => Err(CustomError::Message(Message::ErrUnexpected)),
@@ -277,7 +270,7 @@ impl ToText for i32 {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 }
@@ -287,7 +280,7 @@ impl ToText for BigDecimal {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 }
@@ -297,7 +290,7 @@ impl ToText for String {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 }
@@ -307,7 +300,7 @@ impl ToText for bool {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 }
@@ -328,7 +321,7 @@ impl ToBoolean for bool {
         Ok(*self)
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self))
     }
 }
@@ -433,12 +426,12 @@ impl ToNumber for NumberArithmeticExpression {
             | NumberArithmeticExpression::Divide(v)
             | NumberArithmeticExpression::Modulus(v) => {
                 let mut err: Option<CustomError> = None;
-                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
-                    .chain(v.1)
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
+                    .chain(&v.1)
                     .map(|val| match val.serialize(lang) {
                         Ok(v) => Ok(v),
                         Err(e) => {
-                            err = Some(e);
+                            err = Some(e.clone());
                             Err(e)
                         }
                     })
@@ -449,8 +442,8 @@ impl ToNumber for NumberArithmeticExpression {
                         let args: Vec<Value> = result
                             .iter()
                             .map(|val| match val {
-                                Ok(v) => *v,
-                                Err(e) => panic!(),
+                                Ok(v) => v.clone(),
+                                Err(_) => panic!(),
                             })
                             .collect();
                         Ok(json!({
@@ -586,12 +579,12 @@ impl ToDecimal for DecimalArithmeticExpression {
             | DecimalArithmeticExpression::Divide(v)
             | DecimalArithmeticExpression::Modulus(v) => {
                 let mut err: Option<CustomError> = None;
-                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
-                    .chain(v.1)
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
+                    .chain(&v.1)
                     .map(|val| match val.serialize(lang) {
                         Ok(v) => Ok(v),
                         Err(e) => {
-                            err = Some(e);
+                            err = Some(e.clone());
                             Err(e)
                         }
                     })
@@ -602,8 +595,8 @@ impl ToDecimal for DecimalArithmeticExpression {
                         let args: Vec<Value> = result
                             .iter()
                             .map(|val| match val {
-                                Ok(v) => *v,
-                                Err(e) => panic!(),
+                                Ok(v) => v.clone(),
+                                Err(_) => panic!(),
                             })
                             .collect();
                         Ok(json!({
@@ -774,13 +767,13 @@ impl ToBoolean for NumberComparatorExpression {
             | NumberComparatorExpression::GreaterThan(v)
             | NumberComparatorExpression::LessThan(v) => {
                 let mut err: Option<CustomError> = None;
-                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
-                    .chain(std::iter::once(v.1))
-                    .chain(v.2)
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
+                    .chain(std::iter::once(&v.1))
+                    .chain(&v.2)
                     .map(|val| match val.serialize(lang) {
                         Ok(v) => Ok(v),
                         Err(e) => {
-                            err = Some(e);
+                            err = Some(e.clone());
                             Err(e)
                         }
                     })
@@ -791,8 +784,8 @@ impl ToBoolean for NumberComparatorExpression {
                         let args: Vec<Value> = result
                             .iter()
                             .map(|val| match val {
-                                Ok(v) => *v,
-                                Err(e) => panic!(),
+                                Ok(v) => v.clone(),
+                                Err(_) => panic!(),
                             })
                             .collect();
                         Ok(json!({
@@ -957,13 +950,13 @@ impl ToBoolean for DecimalComparatorExpression {
             | DecimalComparatorExpression::GreaterThan(v)
             | DecimalComparatorExpression::LessThan(v) => {
                 let mut err: Option<CustomError> = None;
-                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
-                    .chain(std::iter::once(v.1))
-                    .chain(v.2)
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
+                    .chain(std::iter::once(&v.1))
+                    .chain(&v.2)
                     .map(|val| match val.serialize(lang) {
                         Ok(v) => Ok(v),
                         Err(e) => {
-                            err = Some(e);
+                            err = Some(e.clone());
                             Err(e)
                         }
                     })
@@ -974,8 +967,8 @@ impl ToBoolean for DecimalComparatorExpression {
                         let args: Vec<Value> = result
                             .iter()
                             .map(|val| match val {
-                                Ok(v) => *v,
-                                Err(e) => panic!(),
+                                Ok(v) => v.clone(),
+                                Err(_) => panic!(),
                             })
                             .collect();
                         Ok(json!({
@@ -1081,19 +1074,6 @@ impl ToText for TextComparatorExpression {
     }
 
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToBoolean).serialize(lang)
-    }
-}
-
-impl ToBoolean for TextComparatorExpression {
-    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean, symbols)? {
-            ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
         let operator: &str = match self {
             TextComparatorExpression::Equals(_) => "==",
             TextComparatorExpression::GreaterThanEquals(_) => ">=",
@@ -1108,13 +1088,13 @@ impl ToBoolean for TextComparatorExpression {
             | TextComparatorExpression::GreaterThan(v)
             | TextComparatorExpression::LessThan(v) => {
                 let mut err: Option<CustomError> = None;
-                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
-                    .chain(std::iter::once(v.1))
-                    .chain(v.2)
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
+                    .chain(std::iter::once(&v.1))
+                    .chain(&v.2)
                     .map(|val| match val.serialize(lang) {
                         Ok(v) => Ok(v),
                         Err(e) => {
-                            err = Some(e);
+                            err = Some(e.clone());
                             Err(e)
                         }
                     })
@@ -1125,8 +1105,8 @@ impl ToBoolean for TextComparatorExpression {
                         let args: Vec<Value> = result
                             .iter()
                             .map(|val| match val {
-                                Ok(v) => *v,
-                                Err(e) => panic!(),
+                                Ok(v) => v.clone(),
+                                Err(_) => panic!(),
                             })
                             .collect();
                         Ok(json!({
@@ -1138,6 +1118,19 @@ impl ToBoolean for TextComparatorExpression {
                 }
             }
         }
+    }
+}
+
+impl ToBoolean for TextComparatorExpression {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean, symbols)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+        (self as &dyn ToBoolean).serialize(lang)
     }
 }
 
@@ -1266,13 +1259,13 @@ impl ToBoolean for LogicalBinaryExpression {
         match self {
             LogicalBinaryExpression::And(v) | LogicalBinaryExpression::Or(v) => {
                 let mut err: Option<CustomError> = None;
-                let result: Vec<Result<Value, CustomError>> = std::iter::once(v.0)
-                    .chain(std::iter::once(v.1))
-                    .chain(v.2)
+                let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
+                    .chain(std::iter::once(&v.1))
+                    .chain(&v.2)
                     .map(|val| match val.serialize(lang) {
                         Ok(v) => Ok(v),
                         Err(e) => {
-                            err = Some(e);
+                            err = Some(e.clone());
                             Err(e)
                         }
                     })
@@ -1283,8 +1276,8 @@ impl ToBoolean for LogicalBinaryExpression {
                         let args: Vec<Value> = result
                             .iter()
                             .map(|val| match val {
-                                Ok(v) => *v,
-                                Err(e) => panic!(),
+                                Ok(v) => v.clone(),
+                                Err(_) => panic!(),
                             })
                             .collect();
                         Ok(json!({
@@ -1513,7 +1506,7 @@ impl ToNumber for NumberMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1524,8 +1517,8 @@ impl ToNumber for NumberMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1549,7 +1542,7 @@ impl ToNumber for NumberMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1560,8 +1553,8 @@ impl ToNumber for NumberMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1585,7 +1578,7 @@ impl ToNumber for NumberMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1596,8 +1589,8 @@ impl ToNumber for NumberMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1621,7 +1614,7 @@ impl ToNumber for NumberMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1632,8 +1625,8 @@ impl ToNumber for NumberMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1845,7 +1838,7 @@ impl ToDecimal for DecimalMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1856,8 +1849,8 @@ impl ToDecimal for DecimalMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1881,7 +1874,7 @@ impl ToDecimal for DecimalMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1892,8 +1885,8 @@ impl ToDecimal for DecimalMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1917,7 +1910,7 @@ impl ToDecimal for DecimalMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1928,8 +1921,8 @@ impl ToDecimal for DecimalMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -1953,7 +1946,7 @@ impl ToDecimal for DecimalMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -1964,8 +1957,8 @@ impl ToDecimal for DecimalMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2141,7 +2134,7 @@ impl ToText for TextMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2152,8 +2145,8 @@ impl ToText for TextMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2177,7 +2170,7 @@ impl ToText for TextMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2188,8 +2181,8 @@ impl ToText for TextMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2213,7 +2206,7 @@ impl ToText for TextMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2224,8 +2217,8 @@ impl ToText for TextMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2249,7 +2242,7 @@ impl ToText for TextMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2260,8 +2253,8 @@ impl ToText for TextMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2428,7 +2421,7 @@ impl ToBoolean for BooleanMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2439,8 +2432,8 @@ impl ToBoolean for BooleanMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2464,7 +2457,7 @@ impl ToBoolean for BooleanMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2475,8 +2468,8 @@ impl ToBoolean for BooleanMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2500,7 +2493,7 @@ impl ToBoolean for BooleanMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2511,8 +2504,8 @@ impl ToBoolean for BooleanMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2536,7 +2529,7 @@ impl ToBoolean for BooleanMatchExpression {
                                 .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
                                     (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
                                     (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e);
+                                        err = Some(e.clone());
                                         Err(e)
                                     }
                                 })
@@ -2547,8 +2540,8 @@ impl ToBoolean for BooleanMatchExpression {
                                 let args: Vec<Vec<Value>> = result
                                     .iter()
                                     .map(|val| match val {
-                                        Ok(v) => *v,
-                                        Err(e) => panic!(),
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
                                     })
                                     .collect();
                                 Ok(json!({
@@ -2604,7 +2597,7 @@ impl DotExpression {
             self.path
                 .iter()
                 .fold(init, |acc, val| match &acc.1.get(val) {
-                    Some(v) => {
+                    Some(_v) => {
                         todo!()
                         // match v {
                         //     Symbol::Leaf(v1) => (Ok(v1), &symbols),
@@ -2612,7 +2605,7 @@ impl DotExpression {
                         //         (Err(CustomError::Message(Message::ErrMissingSymbol)), v1)
                         //     }
                         // }
-                    },
+                    }
                     None => (
                         Err(CustomError::Message(Message::ErrMissingSymbol)),
                         &symbols,
@@ -2629,7 +2622,7 @@ impl DotExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         // TODO
         todo!()
     }
