@@ -90,7 +90,7 @@ impl CustomError {
 
 // Symbols
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Leaf {
     Number(i32),
     Decimal(BigDecimal),
@@ -125,51 +125,6 @@ impl JsonSerializable for Leaf {
 struct Symbol {
     value: Option<Leaf>,
     values: HashMap<String, Symbol>,
-}
-
-impl<V: JsonSerializable> JsonSerializable for HashMap<String, V> {
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let mut values: HashMap<String, Value> = HashMap::new();
-        let result: Result<HashMap<String, Value>, CustomError> = self
-            .iter()
-            .map(|val| match val.1.serialize(lang) {
-                Ok(v) => Ok((val.0.to_string(), v)),
-                Err(e) => Err(e),
-            })
-            .fold(Ok(HashMap::new()), |acc, val| match acc {
-                Ok(v) => match val {
-                    Ok(v1) => {
-                        values.insert(v1.0, v1.1);
-                        Ok(values)
-                    }
-                    Err(e) => Err(e.clone()),
-                },
-                Err(_) => acc,
-            });
-        match result {
-            Ok(v) => Ok(json!(v)),
-            Err(e) => Err(e),
-        }
-    }
-}
-
-impl JsonSerializable for Symbol {
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let value: Result<Value, CustomError> = match &self.value {
-            Some(v) => v.serialize(lang),
-            None => Ok(Value::Null),
-        };
-        match value {
-            Ok(v) => {
-                let values: Result<Value, CustomError> = self.values.serialize(lang);
-                match values {
-                    Ok(v1) => Ok(json!({ "value": v, "values": v1 })),
-                    Err(e) => Err(e),
-                }
-            }
-            Err(e) => Err(e),
-        }
-    }
 }
 
 // Traits
@@ -2589,42 +2544,39 @@ struct DotExpression {
 
 impl DotExpression {
     fn eval(&self, symbols: &HashMap<String, Symbol>) -> Result<DotResult, CustomError> {
-        let init: (Result<&Leaf, CustomError>, &HashMap<String, Symbol>) = (
-            Err(CustomError::Message(Message::ErrMissingSymbol)),
-            &symbols,
-        );
-        let result: (Result<&Leaf, CustomError>, &HashMap<String, Symbol>) =
-            self.path
-                .iter()
-                .fold(init, |acc, val| match &acc.1.get(val) {
-                    Some(_v) => {
-                        todo!()
-                        // match v {
-                        //     Symbol::Leaf(v1) => (Ok(v1), &symbols),
-                        //     Symbol::Node(v1) => {
-                        //         (Err(CustomError::Message(Message::ErrMissingSymbol)), v1)
-                        //     }
-                        // }
-                    }
-                    None => (
-                        Err(CustomError::Message(Message::ErrMissingSymbol)),
-                        &symbols,
-                    ),
-                });
-        match result.0 {
+        let result = Self::get_leaf(&self.path, symbols);
+        match result {
             Ok(v) => match v {
-                Leaf::Number(v1) => Ok(DotResult::Number(*v1)),
-                Leaf::Decimal(v1) => Ok(DotResult::Decimal(v1.clone())),
-                Leaf::Text(v1) => Ok(DotResult::Text(v1.to_string())),
-                Leaf::Boolean(v1) => Ok(DotResult::Boolean(*v1)),
+                Leaf::Number(v1) => Ok(DotResult::Number(v1)),
+                Leaf::Decimal(v1) => Ok(DotResult::Decimal(v1)),
+                Leaf::Text(v1) => Ok(DotResult::Text(v1)),
+                Leaf::Boolean(v1) => Ok(DotResult::Boolean(v1)),
             },
             Err(e) => Err(e),
         }
     }
 
+    fn get_leaf(path: &[String], symbols: &HashMap<String, Symbol>) -> Result<Leaf, CustomError> {
+        match path.first() {
+            Some(v) => match symbols.get(v) {
+                Some(v1) => match path.len() {
+                    1 => match &v1.value {
+                        Some(v2) => Ok(v2.clone()),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => DotExpression::get_leaf(&path[1..], &v1.values),
+                },
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            None => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
-        // TODO
-        todo!()
+        Ok(json!({
+            "op": ".",
+            "args": json!(self.path)
+        }))
     }
 }
 
@@ -3005,15 +2957,34 @@ mod lisp_tests {
     #[test]
     fn test_dot_expression() {
         let symbols: HashMap<String, Symbol> = vec![
-            (String::from("x"), Symbol::Leaf(Leaf::Number(2))),
-            (String::from("y"), Symbol::Leaf(Leaf::Number(3))),
             (
-                String::from("z"),
-                Symbol::Node(
-                    vec![(String::from("z"), Symbol::Leaf(Leaf::Number(6)))]
-                        .into_iter()
-                        .collect(),
-                ),
+                "x".to_string(),
+                Symbol {
+                    value: Some(Leaf::Number(2)),
+                    values: HashMap::new(),
+                },
+            ),
+            (
+                "y".to_string(),
+                Symbol {
+                    value: Some(Leaf::Number(3)),
+                    values: HashMap::new(),
+                },
+            ),
+            (
+                "z".to_string(),
+                Symbol {
+                    value: None,
+                    values: vec![(
+                        "z".to_string(),
+                        Symbol {
+                            value: Some(Leaf::Number(6)),
+                            values: HashMap::new(),
+                        },
+                    )]
+                    .into_iter()
+                    .collect(),
+                },
             ),
         ]
         .into_iter()
