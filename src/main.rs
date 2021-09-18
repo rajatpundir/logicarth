@@ -12,19 +12,8 @@
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{collections::HashMap, str::FromStr};
-
-trait JsonSerializable {
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
-}
-
-trait JsonDeserializable {
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized;
-}
 
 #[derive(Debug)]
 enum Language {
@@ -64,8 +53,8 @@ impl Message {
         result.to_string()
     }
 
-    fn serialize(&self, lang: &Language) -> Value {
-        Value::String(self.to_string(lang))
+    fn serialize(&self) -> Value {
+        json!(self.to_string(&Language::English))
     }
 }
 
@@ -78,7 +67,7 @@ enum CustomError {
 impl CustomError {
     fn serialize(self, lang: &Language) -> Value {
         match self {
-            CustomError::Message(v) => v.serialize(lang),
+            CustomError::Message(v) => v.serialize(),
             CustomError::Messages(v) => Value::Object(
                 v.into_iter()
                     .map(|(key, val)| (key, val.serialize(lang)))
@@ -108,7 +97,7 @@ struct Symbol {
 
 trait ToNumber {
     fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError>;
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn serialize(&self) -> Result<Value, CustomError>;
     fn deserialize(json: Value) -> Result<Self, CustomError>
     where
         Self: Sized;
@@ -125,7 +114,7 @@ impl ToNumber for i32 {
         Ok(*self)
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self))
     }
 
@@ -155,7 +144,7 @@ impl ToNumber for BigDecimal {
         }
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         match self.to_i32() {
             Some(v) => Ok(json!(v)),
             None => Err(CustomError::Message(Message::ErrUnexpected)),
@@ -185,7 +174,7 @@ impl ToNumber for BigDecimal {
 
 trait ToDecimal {
     fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError>;
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn serialize(&self) -> Result<Value, CustomError>;
     fn deserialize(json: Value) -> Result<Self, CustomError>
     where
         Self: Sized;
@@ -205,7 +194,7 @@ impl ToDecimal for i32 {
         }
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         match BigDecimal::from_i32(*self) {
             Some(v) => match v.to_f64() {
                 Some(v1) => Ok(json!(v1)),
@@ -238,7 +227,7 @@ impl ToDecimal for BigDecimal {
         Ok(self.clone())
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         match self.to_f64() {
             Some(v) => Ok(json!(v)),
             None => Err(CustomError::Message(Message::ErrUnexpected)),
@@ -268,7 +257,7 @@ impl ToDecimal for BigDecimal {
 
 trait ToText {
     fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError>;
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn serialize(&self) -> Result<Value, CustomError>;
     fn deserialize(json: Value) -> Result<Self, CustomError>
     where
         Self: Sized;
@@ -285,7 +274,7 @@ impl ToText for i32 {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 
@@ -312,7 +301,7 @@ impl ToText for BigDecimal {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 
@@ -342,7 +331,7 @@ impl ToText for String {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 
@@ -376,7 +365,7 @@ impl ToText for bool {
         Ok(self.to_string())
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
 
@@ -397,7 +386,7 @@ impl ToText for bool {
 
 trait ToBoolean {
     fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError>;
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn serialize(&self) -> Result<Value, CustomError>;
     fn deserialize(json: Value) -> Result<Self, CustomError>
     where
         Self: Sized;
@@ -414,7 +403,7 @@ impl ToBoolean for bool {
         Ok(*self)
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self))
     }
 
@@ -508,17 +497,8 @@ impl NumberArithmeticExpression {
             Err(e) => Err(e),
         }
     }
-}
 
-impl ToNumber for NumberArithmeticExpression {
-    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number, symbols)? {
-            ArithmeticResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         let operator: &str = match self {
             NumberArithmeticExpression::Add(_) => "+",
             NumberArithmeticExpression::Multiply(_) => "*",
@@ -535,7 +515,7 @@ impl ToNumber for NumberArithmeticExpression {
                 let mut err: Option<CustomError> = None;
                 let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
                     .chain(&v.1)
-                    .map(|val| match val.serialize(lang) {
+                    .map(|val| match val.serialize() {
                         Ok(v) => Ok(v),
                         Err(e) => {
                             err = Some(e.clone());
@@ -565,6 +545,19 @@ impl ToNumber for NumberArithmeticExpression {
     }
 }
 
+impl ToNumber for NumberArithmeticExpression {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number, symbols)? {
+            ArithmeticResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
 impl ToDecimal for NumberArithmeticExpression {
     fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
         match self.eval(ArithmeticResultType::Decimal, symbols)? {
@@ -573,8 +566,8 @@ impl ToDecimal for NumberArithmeticExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToNumber).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -586,8 +579,8 @@ impl ToText for NumberArithmeticExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToNumber).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -648,30 +641,8 @@ impl DecimalArithmeticExpression {
             },
         }
     }
-}
 
-impl ToNumber for DecimalArithmeticExpression {
-    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
-        match self.eval(ArithmeticResultType::Number, symbols)? {
-            ArithmeticResult::Number(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToDecimal).serialize(lang)
-    }
-}
-
-impl ToDecimal for DecimalArithmeticExpression {
-    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
-        match self.eval(ArithmeticResultType::Decimal, symbols)? {
-            ArithmeticResult::Decimal(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         let operator: &str = match self {
             DecimalArithmeticExpression::Add(_) => "+",
             DecimalArithmeticExpression::Multiply(_) => "*",
@@ -688,7 +659,7 @@ impl ToDecimal for DecimalArithmeticExpression {
                 let mut err: Option<CustomError> = None;
                 let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
                     .chain(&v.1)
-                    .map(|val| match val.serialize(lang) {
+                    .map(|val| match val.serialize() {
                         Ok(v) => Ok(v),
                         Err(e) => {
                             err = Some(e.clone());
@@ -718,6 +689,32 @@ impl ToDecimal for DecimalArithmeticExpression {
     }
 }
 
+impl ToNumber for DecimalArithmeticExpression {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        match self.eval(ArithmeticResultType::Number, symbols)? {
+            ArithmeticResult::Number(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
+impl ToDecimal for DecimalArithmeticExpression {
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        match self.eval(ArithmeticResultType::Decimal, symbols)? {
+            ArithmeticResult::Decimal(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
 impl ToText for DecimalArithmeticExpression {
     fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
         match self.eval(ArithmeticResultType::Text, symbols)? {
@@ -726,8 +723,8 @@ impl ToText for DecimalArithmeticExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToDecimal).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -836,30 +833,8 @@ impl NumberComparatorExpression {
             }
         }
     }
-}
 
-impl ToText for NumberComparatorExpression {
-    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text, symbols)? {
-            ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToBoolean).serialize(lang)
-    }
-}
-
-impl ToBoolean for NumberComparatorExpression {
-    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean, symbols)? {
-            ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         let operator: &str = match self {
             NumberComparatorExpression::Equals(_) => "==",
             NumberComparatorExpression::GreaterThanEquals(_) => ">=",
@@ -877,7 +852,7 @@ impl ToBoolean for NumberComparatorExpression {
                 let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
                     .chain(std::iter::once(&v.1))
                     .chain(&v.2)
-                    .map(|val| match val.serialize(lang) {
+                    .map(|val| match val.serialize() {
                         Ok(v) => Ok(v),
                         Err(e) => {
                             err = Some(e.clone());
@@ -904,6 +879,32 @@ impl ToBoolean for NumberComparatorExpression {
                 }
             }
         }
+    }
+}
+
+impl ToText for NumberComparatorExpression {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text, symbols)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
+impl ToBoolean for NumberComparatorExpression {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean, symbols)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -1019,30 +1020,8 @@ impl DecimalComparatorExpression {
             }
         }
     }
-}
 
-impl ToText for DecimalComparatorExpression {
-    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text, symbols)? {
-            ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToBoolean).serialize(lang)
-    }
-}
-
-impl ToBoolean for DecimalComparatorExpression {
-    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
-        match self.eval(ComparatorResultType::Boolean, symbols)? {
-            ComparatorResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         let operator: &str = match self {
             DecimalComparatorExpression::Equals(_) => "==",
             DecimalComparatorExpression::GreaterThanEquals(_) => ">=",
@@ -1060,7 +1039,7 @@ impl ToBoolean for DecimalComparatorExpression {
                 let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
                     .chain(std::iter::once(&v.1))
                     .chain(&v.2)
-                    .map(|val| match val.serialize(lang) {
+                    .map(|val| match val.serialize() {
                         Ok(v) => Ok(v),
                         Err(e) => {
                             err = Some(e.clone());
@@ -1087,6 +1066,32 @@ impl ToBoolean for DecimalComparatorExpression {
                 }
             }
         }
+    }
+}
+
+impl ToText for DecimalComparatorExpression {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text, symbols)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
+impl ToBoolean for DecimalComparatorExpression {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(ComparatorResultType::Boolean, symbols)? {
+            ComparatorResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -1170,17 +1175,8 @@ impl TextComparatorExpression {
             }
         }
     }
-}
 
-impl ToText for TextComparatorExpression {
-    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
-        match self.eval(ComparatorResultType::Text, symbols)? {
-            ComparatorResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         let operator: &str = match self {
             TextComparatorExpression::Equals(_) => "==",
             TextComparatorExpression::GreaterThanEquals(_) => ">=",
@@ -1198,7 +1194,7 @@ impl ToText for TextComparatorExpression {
                 let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
                     .chain(std::iter::once(&v.1))
                     .chain(&v.2)
-                    .map(|val| match val.serialize(lang) {
+                    .map(|val| match val.serialize() {
                         Ok(v) => Ok(v),
                         Err(e) => {
                             err = Some(e.clone());
@@ -1228,6 +1224,19 @@ impl ToText for TextComparatorExpression {
     }
 }
 
+impl ToText for TextComparatorExpression {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(ComparatorResultType::Text, symbols)? {
+            ComparatorResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
 impl ToBoolean for TextComparatorExpression {
     fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
         match self.eval(ComparatorResultType::Boolean, symbols)? {
@@ -1236,8 +1245,8 @@ impl ToBoolean for TextComparatorExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToBoolean).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -1335,30 +1344,8 @@ impl LogicalBinaryExpression {
             }
         }
     }
-}
 
-impl ToText for LogicalBinaryExpression {
-    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
-        match self.eval(LogicalResultType::Text, symbols)? {
-            LogicalResult::Text(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToBoolean).serialize(lang)
-    }
-}
-
-impl ToBoolean for LogicalBinaryExpression {
-    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
-        match self.eval(LogicalResultType::Boolean, symbols)? {
-            LogicalResult::Boolean(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
-
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         let operator: &str = match self {
             LogicalBinaryExpression::And(_) => "and",
             LogicalBinaryExpression::Or(_) => "or",
@@ -1369,7 +1356,7 @@ impl ToBoolean for LogicalBinaryExpression {
                 let result: Vec<Result<Value, CustomError>> = std::iter::once(&v.0)
                     .chain(std::iter::once(&v.1))
                     .chain(&v.2)
-                    .map(|val| match val.serialize(lang) {
+                    .map(|val| match val.serialize() {
                         Ok(v) => Ok(v),
                         Err(e) => {
                             err = Some(e.clone());
@@ -1399,6 +1386,32 @@ impl ToBoolean for LogicalBinaryExpression {
     }
 }
 
+impl ToText for LogicalBinaryExpression {
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self.eval(LogicalResultType::Text, symbols)? {
+            LogicalResult::Text(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
+impl ToBoolean for LogicalBinaryExpression {
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        match self.eval(LogicalResultType::Boolean, symbols)? {
+            LogicalResult::Boolean(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
+    }
+}
+
 // UNARY LOGICAL
 
 #[derive(Debug)]
@@ -1424,6 +1437,17 @@ impl LogicalUnaryExpression {
             Err(e) => Err(e),
         }
     }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        match self.value.serialize() {
+            Ok(v) => Ok(json!({
+                "op": "not",
+                "type": "Boolean",
+                "args": v
+            })),
+            Err(e) => Err(e),
+        }
+    }
 }
 
 impl ToText for LogicalUnaryExpression {
@@ -1434,8 +1458,8 @@ impl ToText for LogicalUnaryExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToBoolean).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -1447,15 +1471,8 @@ impl ToBoolean for LogicalUnaryExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        match self.value.serialize(lang) {
-            Ok(v) => Ok(json!({
-                "op": "not",
-                "type": "Boolean",
-                "args": v
-            })),
-            Err(e) => Err(e),
-        }
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -1586,6 +1603,161 @@ impl NumberMatchExpression {
             Err(e) => Err(e),
         }
     }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        let conditional_type: &str = match self {
+            NumberMatchExpression::NumberConditionExpression(_) => "Number",
+            NumberMatchExpression::DecimalConditionExpression(_) => "Decimal",
+            NumberMatchExpression::TextConditionExpression(_) => "Text",
+            NumberMatchExpression::BooleanConditionExpression(_) => "Boolean",
+        };
+        match self {
+            NumberMatchExpression::NumberConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            NumberMatchExpression::DecimalConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            NumberMatchExpression::TextConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            NumberMatchExpression::BooleanConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+        }
+    }
 }
 
 impl ToNumber for NumberMatchExpression {
@@ -1596,159 +1768,8 @@ impl ToNumber for NumberMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let conditional_type: &str = match self {
-            NumberMatchExpression::NumberConditionExpression(_) => "Number",
-            NumberMatchExpression::DecimalConditionExpression(_) => "Decimal",
-            NumberMatchExpression::TextConditionExpression(_) => "Text",
-            NumberMatchExpression::BooleanConditionExpression(_) => "Boolean",
-        };
-        match self {
-            NumberMatchExpression::NumberConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            NumberMatchExpression::DecimalConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            NumberMatchExpression::TextConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            NumberMatchExpression::BooleanConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-        }
+    fn serialize(&self) -> Result<Value, CustomError> {
+        (self as &dyn ToNumber).serialize()
     }
 }
 
@@ -1760,8 +1781,8 @@ impl ToDecimal for NumberMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToNumber).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        (self as &dyn ToNumber).serialize()
     }
 }
 
@@ -1773,8 +1794,8 @@ impl ToText for NumberMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToNumber).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        (self as &dyn ToNumber).serialize()
     }
 }
 
@@ -1905,6 +1926,161 @@ impl DecimalMatchExpression {
             Err(e) => Err(e),
         }
     }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        let conditional_type: &str = match self {
+            DecimalMatchExpression::NumberConditionExpression(_) => "Number",
+            DecimalMatchExpression::DecimalConditionExpression(_) => "Decimal",
+            DecimalMatchExpression::TextConditionExpression(_) => "Text",
+            DecimalMatchExpression::BooleanConditionExpression(_) => "Boolean",
+        };
+        match self {
+            DecimalMatchExpression::NumberConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            DecimalMatchExpression::DecimalConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            DecimalMatchExpression::TextConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            DecimalMatchExpression::BooleanConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+        }
+    }
 }
 
 impl ToNumber for DecimalMatchExpression {
@@ -1915,8 +2091,8 @@ impl ToNumber for DecimalMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToDecimal).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -1928,159 +2104,8 @@ impl ToDecimal for DecimalMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let conditional_type: &str = match self {
-            DecimalMatchExpression::NumberConditionExpression(_) => "Number",
-            DecimalMatchExpression::DecimalConditionExpression(_) => "Decimal",
-            DecimalMatchExpression::TextConditionExpression(_) => "Text",
-            DecimalMatchExpression::BooleanConditionExpression(_) => "Boolean",
-        };
-        match self {
-            DecimalMatchExpression::NumberConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            DecimalMatchExpression::DecimalConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            DecimalMatchExpression::TextConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            DecimalMatchExpression::BooleanConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-        }
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -2092,8 +2117,8 @@ impl ToText for DecimalMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToDecimal).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -2215,6 +2240,161 @@ impl TextMatchExpression {
             Err(e) => Err(e),
         }
     }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        let conditional_type: &str = match self {
+            TextMatchExpression::NumberConditionExpression(_) => "Number",
+            TextMatchExpression::DecimalConditionExpression(_) => "Decimal",
+            TextMatchExpression::TextConditionExpression(_) => "Text",
+            TextMatchExpression::BooleanConditionExpression(_) => "Boolean",
+        };
+        match self {
+            TextMatchExpression::NumberConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            TextMatchExpression::DecimalConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            TextMatchExpression::TextConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            TextMatchExpression::BooleanConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+        }
+    }
 }
 
 impl ToText for TextMatchExpression {
@@ -2224,159 +2404,8 @@ impl ToText for TextMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let conditional_type: &str = match self {
-            TextMatchExpression::NumberConditionExpression(_) => "Number",
-            TextMatchExpression::DecimalConditionExpression(_) => "Decimal",
-            TextMatchExpression::TextConditionExpression(_) => "Text",
-            TextMatchExpression::BooleanConditionExpression(_) => "Boolean",
-        };
-        match self {
-            TextMatchExpression::NumberConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            TextMatchExpression::DecimalConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            TextMatchExpression::TextConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            TextMatchExpression::BooleanConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-        }
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -2501,6 +2530,161 @@ impl BooleanMatchExpression {
             Err(e) => Err(e),
         }
     }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        let conditional_type: &str = match self {
+            BooleanMatchExpression::NumberConditionExpression(_) => "Number",
+            BooleanMatchExpression::DecimalConditionExpression(_) => "Decimal",
+            BooleanMatchExpression::TextConditionExpression(_) => "Text",
+            BooleanMatchExpression::BooleanConditionExpression(_) => "Boolean",
+        };
+        match self {
+            BooleanMatchExpression::NumberConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            BooleanMatchExpression::DecimalConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            BooleanMatchExpression::TextConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+            BooleanMatchExpression::BooleanConditionExpression(v) => match v.0.serialize() {
+                Ok(v1) => match v.2.serialize() {
+                    Ok(v2) => {
+                        let mut err: Option<CustomError> = None;
+                        let result: Vec<Result<Vec<Value>, CustomError>> =
+                            v.1.iter()
+                                .map(|val| match (val.0.serialize(), val.1.serialize()) {
+                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
+                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
+                                        err = Some(e.clone());
+                                        Err(e)
+                                    }
+                                })
+                                .collect();
+                        match err {
+                            Some(e) => Err(e),
+                            None => {
+                                let args: Vec<Vec<Value>> = result
+                                    .iter()
+                                    .map(|val| match val {
+                                        Ok(v) => v.clone(),
+                                        Err(_) => panic!(),
+                                    })
+                                    .collect();
+                                Ok(json!({
+                                    "op": "match",
+                                    "type": conditional_type,
+                                    "args": Value::Array(vec![v1, json!(args),v2])
+                                }))
+                            }
+                        }
+                    }
+                    Err(e) => Err(e),
+                },
+                Err(e) => Err(e),
+            },
+        }
+    }
 }
 
 impl ToBoolean for BooleanMatchExpression {
@@ -2511,159 +2695,8 @@ impl ToBoolean for BooleanMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        let conditional_type: &str = match self {
-            BooleanMatchExpression::NumberConditionExpression(_) => "Number",
-            BooleanMatchExpression::DecimalConditionExpression(_) => "Decimal",
-            BooleanMatchExpression::TextConditionExpression(_) => "Text",
-            BooleanMatchExpression::BooleanConditionExpression(_) => "Boolean",
-        };
-        match self {
-            BooleanMatchExpression::NumberConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            BooleanMatchExpression::DecimalConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            BooleanMatchExpression::TextConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-            BooleanMatchExpression::BooleanConditionExpression(v) => match v.0.serialize(lang) {
-                Ok(v1) => match v.2.serialize(lang) {
-                    Ok(v2) => {
-                        let mut err: Option<CustomError> = None;
-                        let result: Vec<Result<Vec<Value>, CustomError>> =
-                            v.1.iter()
-                                .map(|val| match (val.0.serialize(lang), val.1.serialize(lang)) {
-                                    (Ok(v3), Ok(v4)) => Ok(vec![v3, v4]),
-                                    (Ok(_), Err(e)) | (Err(e), Ok(_)) | (Err(e), Err(_)) => {
-                                        err = Some(e.clone());
-                                        Err(e)
-                                    }
-                                })
-                                .collect();
-                        match err {
-                            Some(e) => Err(e),
-                            None => {
-                                let args: Vec<Vec<Value>> = result
-                                    .iter()
-                                    .map(|val| match val {
-                                        Ok(v) => v.clone(),
-                                        Err(_) => panic!(),
-                                    })
-                                    .collect();
-                                Ok(json!({
-                                    "op": "match",
-                                    "type": conditional_type,
-                                    "args": Value::Array(vec![v1, json!(args),v2])
-                                }))
-                            }
-                        }
-                    }
-                    Err(e) => Err(e),
-                },
-                Err(e) => Err(e),
-            },
-        }
+    fn serialize(&self) -> Result<Value, CustomError> {
+        (self as &dyn ToText).serialize()
     }
 }
 
@@ -2675,8 +2708,8 @@ impl ToText for BooleanMatchExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        (self as &dyn ToText).serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        (self as &dyn ToText).serialize()
     }
 }
 
@@ -2724,7 +2757,7 @@ impl DotExpression {
         }
     }
 
-    fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
+    fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!({
             "op": ".",
             "args": json!(self.path)
@@ -2744,8 +2777,8 @@ impl ToNumber for DotExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        self.serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -2761,8 +2794,8 @@ impl ToDecimal for DotExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        self.serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -2776,8 +2809,8 @@ impl ToText for DotExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        self.serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
@@ -2789,42 +2822,136 @@ impl ToBoolean for DotExpression {
         }
     }
 
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        self.serialize(lang)
+    fn serialize(&self) -> Result<Value, CustomError> {
+        self.serialize()
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Person {
-    name: String,
-    age: usize,
-    verified: bool,
+enum LispExpression {
+    NumberArithmeticExpression(NumberArithmeticExpression),
+    DecimalArithmeticExpression(DecimalArithmeticExpression),
+    NumberComparatorExpression(NumberComparatorExpression),
+    DecimalComparatorExpression(DecimalComparatorExpression),
+    TextComparatorExpression(TextComparatorExpression),
+    LogicalBinaryExpression(LogicalBinaryExpression),
+    LogicalUnaryExpression(LogicalUnaryExpression),
+    NumberMatchExpression(NumberMatchExpression),
+    DecimalMatchExpression(DecimalMatchExpression),
+    TextMatchExpression(TextMatchExpression),
+    BooleanMatchExpression(BooleanMatchExpression),
+    DotExpression(DotExpression),
+}
+
+impl LispExpression {
+    fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError> {
+        let err = Err(CustomError::Message(Message::ErrUnexpected));
+        match self {
+            LispExpression::NumberArithmeticExpression(v) => v.get_number(symbols),
+            LispExpression::DecimalArithmeticExpression(v) => v.get_number(symbols),
+            LispExpression::NumberComparatorExpression(v) => err,
+            LispExpression::DecimalComparatorExpression(v) => err,
+            LispExpression::TextComparatorExpression(v) => err,
+            LispExpression::LogicalBinaryExpression(v) => err,
+            LispExpression::LogicalUnaryExpression(v) => err,
+            LispExpression::NumberMatchExpression(v) => v.get_number(symbols),
+            LispExpression::DecimalMatchExpression(v) => v.get_number(symbols),
+            LispExpression::TextMatchExpression(v) => err,
+            LispExpression::BooleanMatchExpression(v) => err,
+            LispExpression::DotExpression(v) => v.get_number(symbols),
+        }
+    }
+
+    fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError> {
+        let err = Err(CustomError::Message(Message::ErrUnexpected));
+        match self {
+            LispExpression::NumberArithmeticExpression(v) => v.get_decimal(symbols),
+            LispExpression::DecimalArithmeticExpression(v) => v.get_decimal(symbols),
+            LispExpression::NumberComparatorExpression(v) => err,
+            LispExpression::DecimalComparatorExpression(v) => err,
+            LispExpression::TextComparatorExpression(v) => err,
+            LispExpression::LogicalBinaryExpression(v) => err,
+            LispExpression::LogicalUnaryExpression(v) => err,
+            LispExpression::NumberMatchExpression(v) => v.get_decimal(symbols),
+            LispExpression::DecimalMatchExpression(v) => v.get_decimal(symbols),
+            LispExpression::TextMatchExpression(v) => err,
+            LispExpression::BooleanMatchExpression(v) => err,
+            LispExpression::DotExpression(v) => v.get_decimal(symbols),
+        }
+    }
+
+    fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError> {
+        match self {
+            LispExpression::NumberArithmeticExpression(v) => v.get_text(symbols),
+            LispExpression::DecimalArithmeticExpression(v) => v.get_text(symbols),
+            LispExpression::NumberComparatorExpression(v) => v.get_text(symbols),
+            LispExpression::DecimalComparatorExpression(v) => v.get_text(symbols),
+            LispExpression::TextComparatorExpression(v) => v.get_text(symbols),
+            LispExpression::LogicalBinaryExpression(v) => v.get_text(symbols),
+            LispExpression::LogicalUnaryExpression(v) => v.get_text(symbols),
+            LispExpression::NumberMatchExpression(v) => v.get_text(symbols),
+            LispExpression::DecimalMatchExpression(v) => v.get_text(symbols),
+            LispExpression::TextMatchExpression(v) => v.get_text(symbols),
+            LispExpression::BooleanMatchExpression(v) => v.get_text(symbols),
+            LispExpression::DotExpression(v) => v.get_text(symbols),
+        }
+    }
+
+    fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError> {
+        let err = Err(CustomError::Message(Message::ErrUnexpected));
+        match self {
+            LispExpression::NumberArithmeticExpression(v) => err,
+            LispExpression::DecimalArithmeticExpression(v) => err,
+            LispExpression::NumberComparatorExpression(v) => v.get_boolean(symbols),
+            LispExpression::DecimalComparatorExpression(v) => v.get_boolean(symbols),
+            LispExpression::TextComparatorExpression(v) => v.get_boolean(symbols),
+            LispExpression::LogicalBinaryExpression(v) => v.get_boolean(symbols),
+            LispExpression::LogicalUnaryExpression(v) => v.get_boolean(symbols),
+            LispExpression::NumberMatchExpression(v) => err,
+            LispExpression::DecimalMatchExpression(v) => err,
+            LispExpression::TextMatchExpression(v) => err,
+            LispExpression::BooleanMatchExpression(v) => v.get_boolean(symbols),
+            LispExpression::DotExpression(v) => v.get_boolean(symbols),
+        }
+    }
+
+    fn serialize(&self) -> Result<Value, CustomError> {
+        match self {
+            LispExpression::NumberArithmeticExpression(v) => v.serialize(),
+            LispExpression::DecimalArithmeticExpression(v) => v.serialize(),
+            LispExpression::NumberComparatorExpression(v) => v.serialize(),
+            LispExpression::DecimalComparatorExpression(v) => v.serialize(),
+            LispExpression::TextComparatorExpression(v) => v.serialize(),
+            LispExpression::LogicalBinaryExpression(v) => v.serialize(),
+            LispExpression::LogicalUnaryExpression(v) => v.serialize(),
+            LispExpression::NumberMatchExpression(v) => v.serialize(),
+            LispExpression::DecimalMatchExpression(v) => v.serialize(),
+            LispExpression::TextMatchExpression(v) => v.serialize(),
+            LispExpression::BooleanMatchExpression(v) => v.serialize(),
+            LispExpression::DotExpression(v) => v.serialize(),
+        }
+    }
+
+    fn deserialize(json: Value) -> Result<LispExpression, CustomError> {
+        match json {
+            Value::Object(v) => match (v.get("op"), v.get("type"), v.get("args")) {
+                (Some(v1), Some(v2), Some(v3)) => match v1 {
+                    Value::String(v4) => match v4.as_str() {
+                        "+" | "*" | "-" | "/" | "%" => {
+                            todo!()
+                        }
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 fn main() {
-    let json = r#"
-        {
-          "name": "George",
-          "age": 27,
-          "verified": false
-        }
-    "#;
-
-    let person: Person = serde_json::from_str(json).unwrap();
-    let x = serde_json::json!({
-        "a": 2,
-        "b": 4,
-        "c": {
-            "a": 2,
-            "b": []
-        }
-    });
-    println!("{:#}", x.to_string());
-
-    println!("{:?}", person);
     println!("Hello, world!");
-    let x = Value::Array(vec![Value::Bool(true), Value::Bool(false)]);
-    println!("{:?}", x.to_string());
 }
 
 #[cfg(test)]
