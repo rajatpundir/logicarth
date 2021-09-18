@@ -14,7 +14,7 @@ use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::HashMap;
+use std::{collections::HashMap, str::FromStr};
 
 trait JsonSerializable {
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
@@ -98,29 +98,6 @@ enum Leaf {
     Boolean(bool),
 }
 
-impl JsonSerializable for Leaf {
-    fn serialize(&self, lang: &Language) -> Result<Value, CustomError> {
-        match self {
-            Leaf::Number(v) => Ok(json!({
-                "type": "Number",
-                "value": v
-            })),
-            Leaf::Decimal(v) => Ok(json!({
-                "type": "Decimal",
-                "value": (v as &dyn ToDecimal).serialize(lang)?
-            })),
-            Leaf::Text(v) => Ok(json!({
-                "type": "Text",
-                "value": v
-            })),
-            Leaf::Boolean(v) => Ok(json!({
-                "type": "Boolean",
-                "value": v
-            })),
-        }
-    }
-}
-
 #[derive(Debug)]
 struct Symbol {
     value: Option<Leaf>,
@@ -132,6 +109,9 @@ struct Symbol {
 trait ToNumber {
     fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError>;
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized;
 }
 
 impl Debug for dyn ToNumber {
@@ -147,6 +127,23 @@ impl ToNumber for i32 {
 
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self))
+    }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.as_i64() {
+                Some(v1) => Ok(v1 as i32),
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::String(v) => match v.parse::<i32>() {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 }
 
@@ -164,11 +161,34 @@ impl ToNumber for BigDecimal {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.as_f64() {
+                Some(v1) => match BigDecimal::from_f64(v1) {
+                    Some(v2) => Ok(v2),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::String(v) => match BigDecimal::from_str(&v) {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 trait ToDecimal {
     fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError>;
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized;
 }
 
 impl Debug for dyn ToDecimal {
@@ -194,6 +214,23 @@ impl ToDecimal for i32 {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.as_i64() {
+                Some(v1) => Ok(v1 as i32),
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::String(v) => match v.parse::<i32>() {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 impl ToDecimal for BigDecimal {
@@ -207,11 +244,34 @@ impl ToDecimal for BigDecimal {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.as_f64() {
+                Some(v1) => match BigDecimal::from_f64(v1) {
+                    Some(v2) => Ok(v2),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::String(v) => match BigDecimal::from_str(&v) {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 trait ToText {
     fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError>;
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized;
 }
 
 impl Debug for dyn ToText {
@@ -228,6 +288,23 @@ impl ToText for i32 {
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.as_i64() {
+                Some(v1) => Ok(v1 as i32),
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::String(v) => match v.parse::<i32>() {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 impl ToText for BigDecimal {
@@ -237,6 +314,26 @@ impl ToText for BigDecimal {
 
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
+    }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.as_f64() {
+                Some(v1) => match BigDecimal::from_f64(v1) {
+                    Some(v2) => Ok(v2),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                None => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::String(v) => match BigDecimal::from_str(&v) {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 }
 
@@ -248,6 +345,30 @@ impl ToText for String {
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Number(v) => match v.is_f64() {
+                true => match v.as_f64() {
+                    Some(v1) => match BigDecimal::from_f64(v1) {
+                        Some(v2) => Ok(v2.to_string()),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                false => match v.as_i64() {
+                    Some(v1) => Ok((v1 as i32).to_string()),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::Bool(v) => Ok(v.to_string()),
+            Value::String(v) => Ok(v),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 impl ToText for bool {
@@ -258,11 +379,28 @@ impl ToText for bool {
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Bool(v) => Ok(v),
+            Value::String(v) => match v.parse::<bool>() {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
 }
 
 trait ToBoolean {
     fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError>;
     fn serialize(&self, lang: &Language) -> Result<Value, CustomError>;
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized;
 }
 
 impl Debug for dyn ToBoolean {
@@ -278,6 +416,20 @@ impl ToBoolean for bool {
 
     fn serialize(&self, _lang: &Language) -> Result<Value, CustomError> {
         Ok(json!(self))
+    }
+
+    fn deserialize(json: Value) -> Result<Self, CustomError>
+    where
+        Self: Sized,
+    {
+        match json {
+            Value::Bool(v) => Ok(v),
+            Value::String(v) => match v.parse::<bool>() {
+                Ok(v1) => Ok(v1),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 }
 
@@ -2684,14 +2836,16 @@ mod lisp_tests {
     #[test]
     fn test_number_arithmetic_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        assert_eq!(
-            11,
-            DecimalArithmeticExpression::Add((
-                Box::new(2),
-                vec![Box::new(BigDecimal::from_str("2.3").unwrap()), Box::new(7)]
-            ))
-            .get_number(&symbols)
-            .unwrap()
+        let expr = DecimalArithmeticExpression::Add((
+            Box::new(2),
+            vec![Box::new(BigDecimal::from_str("2.3").unwrap()), Box::new(7)],
+        ));
+        assert_eq!(11, (&expr).get_number(&symbols).unwrap());
+        println!(
+            "{}",
+            (&expr as &dyn ToDecimal)
+                .serialize(&Language::English)
+                .unwrap()
         );
     }
 
