@@ -13,7 +13,7 @@
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
 use serde_json::{json, Value};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, rc::Rc};
 
 #[derive(Debug)]
 enum Language {
@@ -98,10 +98,8 @@ struct Symbol {
 trait ToNumber {
     fn get_number(&self, symbols: &HashMap<String, Symbol>) -> Result<i32, CustomError>;
     fn serialize(&self) -> Result<Value, CustomError>;
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized;
 }
+// dyn_clone::clone_trait_object!(ToNumber);
 
 impl Debug for dyn ToNumber {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -116,23 +114,6 @@ impl ToNumber for i32 {
 
     fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self))
-    }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.as_i64() {
-                Some(v1) => Ok(v1 as i32),
-                None => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            Value::String(v) => match v.parse::<i32>() {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
     }
 }
 
@@ -150,35 +131,13 @@ impl ToNumber for BigDecimal {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.as_f64() {
-                Some(v1) => match BigDecimal::from_f64(v1) {
-                    Some(v2) => Ok(v2),
-                    None => Err(CustomError::Message(Message::ErrUnexpected)),
-                },
-                None => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            Value::String(v) => match BigDecimal::from_str(&v) {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
 }
 
 trait ToDecimal {
     fn get_decimal(&self, symbols: &HashMap<String, Symbol>) -> Result<BigDecimal, CustomError>;
     fn serialize(&self) -> Result<Value, CustomError>;
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized;
 }
+// dyn_clone::clone_trait_object!(ToDecimal);
 
 impl Debug for dyn ToDecimal {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -203,23 +162,6 @@ impl ToDecimal for i32 {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.as_i64() {
-                Some(v1) => Ok(v1 as i32),
-                None => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            Value::String(v) => match v.parse::<i32>() {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
 }
 
 impl ToDecimal for BigDecimal {
@@ -233,35 +175,13 @@ impl ToDecimal for BigDecimal {
             None => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.as_f64() {
-                Some(v1) => match BigDecimal::from_f64(v1) {
-                    Some(v2) => Ok(v2),
-                    None => Err(CustomError::Message(Message::ErrUnexpected)),
-                },
-                None => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            Value::String(v) => match BigDecimal::from_str(&v) {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
 }
 
 trait ToText {
     fn get_text(&self, symbols: &HashMap<String, Symbol>) -> Result<String, CustomError>;
     fn serialize(&self) -> Result<Value, CustomError>;
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized;
 }
+// dyn_clone::clone_trait_object!(ToText);
 
 impl Debug for dyn ToText {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -277,23 +197,6 @@ impl ToText for i32 {
     fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.as_i64() {
-                Some(v1) => Ok(v1 as i32),
-                None => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            Value::String(v) => match v.parse::<i32>() {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
 }
 
 impl ToText for BigDecimal {
@@ -303,26 +206,6 @@ impl ToText for BigDecimal {
 
     fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
-    }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.as_f64() {
-                Some(v1) => match BigDecimal::from_f64(v1) {
-                    Some(v2) => Ok(v2),
-                    None => Err(CustomError::Message(Message::ErrUnexpected)),
-                },
-                None => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            Value::String(v) => match BigDecimal::from_str(&v) {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
     }
 }
 
@@ -334,30 +217,6 @@ impl ToText for String {
     fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Number(v) => match v.is_f64() {
-                true => match v.as_f64() {
-                    Some(v1) => match BigDecimal::from_f64(v1) {
-                        Some(v2) => Ok(v2.to_string()),
-                        None => Err(CustomError::Message(Message::ErrUnexpected)),
-                    },
-                    None => Err(CustomError::Message(Message::ErrUnexpected)),
-                },
-                false => match v.as_i64() {
-                    Some(v1) => Ok((v1 as i32).to_string()),
-                    None => Err(CustomError::Message(Message::ErrUnexpected)),
-                },
-            },
-            Value::Bool(v) => Ok(v.to_string()),
-            Value::String(v) => Ok(v),
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
 }
 
 impl ToText for bool {
@@ -368,29 +227,13 @@ impl ToText for bool {
     fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self.to_string()))
     }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Bool(v) => Ok(v),
-            Value::String(v) => match v.parse::<bool>() {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
-    }
 }
 
 trait ToBoolean {
     fn get_boolean(&self, symbols: &HashMap<String, Symbol>) -> Result<bool, CustomError>;
     fn serialize(&self) -> Result<Value, CustomError>;
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized;
 }
+// dyn_clone::clone_trait_object!(ToBoolean);
 
 impl Debug for dyn ToBoolean {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -405,20 +248,6 @@ impl ToBoolean for bool {
 
     fn serialize(&self) -> Result<Value, CustomError> {
         Ok(json!(self))
-    }
-
-    fn deserialize(json: Value) -> Result<Self, CustomError>
-    where
-        Self: Sized,
-    {
-        match json {
-            Value::Bool(v) => Ok(v),
-            Value::String(v) => match v.parse::<bool>() {
-                Ok(v1) => Ok(v1),
-                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
-            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-        }
     }
 }
 
@@ -449,13 +278,13 @@ enum ArithmeticOperator {
 
 // NUMBER ARITHMETIC
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum NumberArithmeticExpression {
-    Add((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    Multiply((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    Subtract((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    Divide((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    Modulus((Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    Add((Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    Multiply((Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    Subtract((Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    Divide((Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    Modulus((Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
 }
 
 impl NumberArithmeticExpression {
@@ -586,13 +415,13 @@ impl ToText for NumberArithmeticExpression {
 
 // DECIMAL ARITHMETIC
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum DecimalArithmeticExpression {
-    Add((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
-    Multiply((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
-    Subtract((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
-    Divide((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
-    Modulus((Box<dyn ToDecimal>, Vec<Box<dyn ToDecimal>>)),
+    Add((Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    Multiply((Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    Subtract((Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    Divide((Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    Modulus((Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
 }
 
 impl DecimalArithmeticExpression {
@@ -753,13 +582,13 @@ enum ComparatorOperator {
 
 // NUMBER COMPARATOR
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum NumberComparatorExpression {
-    Equals((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    GreaterThan((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    LessThan((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    GreaterThanEquals((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
-    LessThanEquals((Box<dyn ToNumber>, Box<dyn ToNumber>, Vec<Box<dyn ToNumber>>)),
+    Equals((Rc<dyn ToNumber>, Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    GreaterThan((Rc<dyn ToNumber>, Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    LessThan((Rc<dyn ToNumber>, Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    GreaterThanEquals((Rc<dyn ToNumber>, Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
+    LessThanEquals((Rc<dyn ToNumber>, Rc<dyn ToNumber>, Vec<Rc<dyn ToNumber>>)),
 }
 
 impl NumberComparatorExpression {
@@ -910,41 +739,41 @@ impl ToBoolean for NumberComparatorExpression {
 
 // DECIMAL COMPARATOR
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum DecimalComparatorExpression {
     Equals(
         (
-            Box<dyn ToDecimal>,
-            Box<dyn ToDecimal>,
-            Vec<Box<dyn ToDecimal>>,
+            Rc<dyn ToDecimal>,
+            Rc<dyn ToDecimal>,
+            Vec<Rc<dyn ToDecimal>>,
         ),
     ),
     GreaterThan(
         (
-            Box<dyn ToDecimal>,
-            Box<dyn ToDecimal>,
-            Vec<Box<dyn ToDecimal>>,
+            Rc<dyn ToDecimal>,
+            Rc<dyn ToDecimal>,
+            Vec<Rc<dyn ToDecimal>>,
         ),
     ),
     LessThan(
         (
-            Box<dyn ToDecimal>,
-            Box<dyn ToDecimal>,
-            Vec<Box<dyn ToDecimal>>,
+            Rc<dyn ToDecimal>,
+            Rc<dyn ToDecimal>,
+            Vec<Rc<dyn ToDecimal>>,
         ),
     ),
     GreaterThanEquals(
         (
-            Box<dyn ToDecimal>,
-            Box<dyn ToDecimal>,
-            Vec<Box<dyn ToDecimal>>,
+            Rc<dyn ToDecimal>,
+            Rc<dyn ToDecimal>,
+            Vec<Rc<dyn ToDecimal>>,
         ),
     ),
     LessThanEquals(
         (
-            Box<dyn ToDecimal>,
-            Box<dyn ToDecimal>,
-            Vec<Box<dyn ToDecimal>>,
+            Rc<dyn ToDecimal>,
+            Rc<dyn ToDecimal>,
+            Vec<Rc<dyn ToDecimal>>,
         ),
     ),
 }
@@ -1097,13 +926,13 @@ impl ToBoolean for DecimalComparatorExpression {
 
 // TEXT COMPARATOR
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum TextComparatorExpression {
-    Equals((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
-    GreaterThan((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
-    LessThan((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
-    GreaterThanEquals((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
-    LessThanEquals((Box<dyn ToText>, Box<dyn ToText>, Vec<Box<dyn ToText>>)),
+    Equals((Rc<dyn ToText>, Rc<dyn ToText>, Vec<Rc<dyn ToText>>)),
+    GreaterThan((Rc<dyn ToText>, Rc<dyn ToText>, Vec<Rc<dyn ToText>>)),
+    LessThan((Rc<dyn ToText>, Rc<dyn ToText>, Vec<Rc<dyn ToText>>)),
+    GreaterThanEquals((Rc<dyn ToText>, Rc<dyn ToText>, Vec<Rc<dyn ToText>>)),
+    LessThanEquals((Rc<dyn ToText>, Rc<dyn ToText>, Vec<Rc<dyn ToText>>)),
 }
 
 impl TextComparatorExpression {
@@ -1272,20 +1101,20 @@ enum LogicalBinaryOperator {
     Or,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum LogicalBinaryExpression {
     And(
         (
-            Box<dyn ToBoolean>,
-            Box<dyn ToBoolean>,
-            Vec<Box<dyn ToBoolean>>,
+            Rc<dyn ToBoolean>,
+            Rc<dyn ToBoolean>,
+            Vec<Rc<dyn ToBoolean>>,
         ),
     ),
     Or(
         (
-            Box<dyn ToBoolean>,
-            Box<dyn ToBoolean>,
-            Vec<Box<dyn ToBoolean>>,
+            Rc<dyn ToBoolean>,
+            Rc<dyn ToBoolean>,
+            Vec<Rc<dyn ToBoolean>>,
         ),
     ),
 }
@@ -1414,9 +1243,9 @@ impl ToBoolean for LogicalBinaryExpression {
 
 // UNARY LOGICAL
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct LogicalUnaryExpression {
-    value: Box<dyn ToBoolean>,
+    value: Rc<dyn ToBoolean>,
 }
 
 impl LogicalUnaryExpression {
@@ -1492,33 +1321,34 @@ enum NumberMatchResult {
     Text(String),
 }
 
+#[derive(Debug, Clone)]
 enum NumberMatchExpression {
     NumberConditionExpression(
         (
-            Box<dyn ToNumber>,
-            Vec<(Box<dyn ToNumber>, Box<dyn ToNumber>)>,
-            Box<dyn ToNumber>,
+            Rc<dyn ToNumber>,
+            Vec<(Rc<dyn ToNumber>, Rc<dyn ToNumber>)>,
+            Rc<dyn ToNumber>,
         ),
     ),
     DecimalConditionExpression(
         (
-            Box<dyn ToDecimal>,
-            Vec<(Box<dyn ToDecimal>, Box<dyn ToNumber>)>,
-            Box<dyn ToNumber>,
+            Rc<dyn ToDecimal>,
+            Vec<(Rc<dyn ToDecimal>, Rc<dyn ToNumber>)>,
+            Rc<dyn ToNumber>,
         ),
     ),
     TextConditionExpression(
         (
-            Box<dyn ToText>,
-            Vec<(Box<dyn ToText>, Box<dyn ToNumber>)>,
-            Box<dyn ToNumber>,
+            Rc<dyn ToText>,
+            Vec<(Rc<dyn ToText>, Rc<dyn ToNumber>)>,
+            Rc<dyn ToNumber>,
         ),
     ),
     BooleanConditionExpression(
         (
-            Box<dyn ToBoolean>,
-            Vec<(Box<dyn ToBoolean>, Box<dyn ToNumber>)>,
-            Box<dyn ToNumber>,
+            Rc<dyn ToBoolean>,
+            Vec<(Rc<dyn ToBoolean>, Rc<dyn ToNumber>)>,
+            Rc<dyn ToNumber>,
         ),
     ),
 }
@@ -1815,33 +1645,34 @@ enum DecimalMatchResult {
     Text(String),
 }
 
+#[derive(Debug, Clone)]
 enum DecimalMatchExpression {
     NumberConditionExpression(
         (
-            Box<dyn ToNumber>,
-            Vec<(Box<dyn ToNumber>, Box<dyn ToDecimal>)>,
-            Box<dyn ToDecimal>,
+            Rc<dyn ToNumber>,
+            Vec<(Rc<dyn ToNumber>, Rc<dyn ToDecimal>)>,
+            Rc<dyn ToDecimal>,
         ),
     ),
     DecimalConditionExpression(
         (
-            Box<dyn ToDecimal>,
-            Vec<(Box<dyn ToDecimal>, Box<dyn ToDecimal>)>,
-            Box<dyn ToDecimal>,
+            Rc<dyn ToDecimal>,
+            Vec<(Rc<dyn ToDecimal>, Rc<dyn ToDecimal>)>,
+            Rc<dyn ToDecimal>,
         ),
     ),
     TextConditionExpression(
         (
-            Box<dyn ToText>,
-            Vec<(Box<dyn ToText>, Box<dyn ToDecimal>)>,
-            Box<dyn ToDecimal>,
+            Rc<dyn ToText>,
+            Vec<(Rc<dyn ToText>, Rc<dyn ToDecimal>)>,
+            Rc<dyn ToDecimal>,
         ),
     ),
     BooleanConditionExpression(
         (
-            Box<dyn ToBoolean>,
-            Vec<(Box<dyn ToBoolean>, Box<dyn ToDecimal>)>,
-            Box<dyn ToDecimal>,
+            Rc<dyn ToBoolean>,
+            Vec<(Rc<dyn ToBoolean>, Rc<dyn ToDecimal>)>,
+            Rc<dyn ToDecimal>,
         ),
     ),
 }
@@ -2134,33 +1965,34 @@ enum TextMatchResult {
     Text(String),
 }
 
+#[derive(Debug, Clone)]
 enum TextMatchExpression {
     NumberConditionExpression(
         (
-            Box<dyn ToNumber>,
-            Vec<(Box<dyn ToNumber>, Box<dyn ToText>)>,
-            Box<dyn ToText>,
+            Rc<dyn ToNumber>,
+            Vec<(Rc<dyn ToNumber>, Rc<dyn ToText>)>,
+            Rc<dyn ToText>,
         ),
     ),
     DecimalConditionExpression(
         (
-            Box<dyn ToDecimal>,
-            Vec<(Box<dyn ToDecimal>, Box<dyn ToText>)>,
-            Box<dyn ToText>,
+            Rc<dyn ToDecimal>,
+            Vec<(Rc<dyn ToDecimal>, Rc<dyn ToText>)>,
+            Rc<dyn ToText>,
         ),
     ),
     TextConditionExpression(
         (
-            Box<dyn ToText>,
-            Vec<(Box<dyn ToText>, Box<dyn ToText>)>,
-            Box<dyn ToText>,
+            Rc<dyn ToText>,
+            Vec<(Rc<dyn ToText>, Rc<dyn ToText>)>,
+            Rc<dyn ToText>,
         ),
     ),
     BooleanConditionExpression(
         (
-            Box<dyn ToBoolean>,
-            Vec<(Box<dyn ToBoolean>, Box<dyn ToText>)>,
-            Box<dyn ToText>,
+            Rc<dyn ToBoolean>,
+            Vec<(Rc<dyn ToBoolean>, Rc<dyn ToText>)>,
+            Rc<dyn ToText>,
         ),
     ),
 }
@@ -2423,33 +2255,34 @@ enum BooleanMatchResult {
     Text(String),
 }
 
+#[derive(Debug, Clone)]
 enum BooleanMatchExpression {
     NumberConditionExpression(
         (
-            Box<dyn ToNumber>,
-            Vec<(Box<dyn ToNumber>, Box<dyn ToBoolean>)>,
-            Box<dyn ToBoolean>,
+            Rc<dyn ToNumber>,
+            Vec<(Rc<dyn ToNumber>, Rc<dyn ToBoolean>)>,
+            Rc<dyn ToBoolean>,
         ),
     ),
     DecimalConditionExpression(
         (
-            Box<dyn ToDecimal>,
-            Vec<(Box<dyn ToDecimal>, Box<dyn ToBoolean>)>,
-            Box<dyn ToBoolean>,
+            Rc<dyn ToDecimal>,
+            Vec<(Rc<dyn ToDecimal>, Rc<dyn ToBoolean>)>,
+            Rc<dyn ToBoolean>,
         ),
     ),
     TextConditionExpression(
         (
-            Box<dyn ToText>,
-            Vec<(Box<dyn ToText>, Box<dyn ToBoolean>)>,
-            Box<dyn ToBoolean>,
+            Rc<dyn ToText>,
+            Vec<(Rc<dyn ToText>, Rc<dyn ToBoolean>)>,
+            Rc<dyn ToBoolean>,
         ),
     ),
     BooleanConditionExpression(
         (
-            Box<dyn ToBoolean>,
-            Vec<(Box<dyn ToBoolean>, Box<dyn ToBoolean>)>,
-            Box<dyn ToBoolean>,
+            Rc<dyn ToBoolean>,
+            Vec<(Rc<dyn ToBoolean>, Rc<dyn ToBoolean>)>,
+            Rc<dyn ToBoolean>,
         ),
     ),
 }
@@ -2723,6 +2556,7 @@ enum DotResult {
     Text(String),
 }
 
+#[derive(Debug, Clone)]
 struct DotExpression {
     path: Vec<String>,
 }
@@ -2931,20 +2765,270 @@ impl LispExpression {
         }
     }
 
-    fn deserialize(json: Value) -> Result<LispExpression, CustomError> {
-        match json {
-            Value::Object(v) => match (v.get("op"), v.get("type"), v.get("args")) {
-                (Some(v1), Some(v2), Some(v3)) => match v1 {
-                    Value::String(v4) => match v4.as_str() {
-                        "+" | "*" | "-" | "/" | "%" => {
-                            todo!()
-                        }
-                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+    fn deserialize_to_number(values: &Vec<Value>) -> Result<Vec<Rc<dyn ToNumber>>, CustomError> {
+        let init: Vec<Result<Rc<dyn ToNumber>, CustomError>> = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Number(v) => match v.is_f64() {
+                        true => match v.as_f64() {
+                            Some(v1) => match BigDecimal::from_f64(v1) {
+                                Some(v2) => Ok(Rc::new(v2)),
+                                None => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        false => match v.as_i64() {
+                            Some(v1) => Ok(Rc::new(v1 as i32)),
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                    },
+                    Value::String(v) => match v.parse::<i32>() {
+                        Ok(v1) => Ok(Rc::new(v1)),
+                        Err(_) => match v.parse::<f64>() {
+                            Ok(v2) => match BigDecimal::from_f64(v2) {
+                                Some(v3) => Ok(Rc::new(v3)),
+                                None => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                    },
+                    Value::Object(_) => match Self::deserialize(val.clone()) {
+                        Ok(v) => match v {
+                            LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
                     },
                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                },
-                _ => Err(CustomError::Message(Message::ErrUnexpected)),
-            },
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_decimal(values: &Vec<Value>) -> Result<Vec<Rc<dyn ToDecimal>>, CustomError> {
+        let init: Vec<Result<Rc<dyn ToDecimal>, CustomError>> = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Number(v) => match v.is_f64() {
+                        true => match v.as_f64() {
+                            Some(v1) => match BigDecimal::from_f64(v1) {
+                                Some(v2) => Ok(Rc::new(v2)),
+                                None => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        false => match v.as_i64() {
+                            Some(v1) => Ok(Rc::new(v1 as i32)),
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                    },
+                    Value::String(v) => match v.parse::<i32>() {
+                        Ok(v1) => Ok(Rc::new(v1)),
+                        Err(_) => match v.parse::<f64>() {
+                            Ok(v2) => match BigDecimal::from_f64(v2) {
+                                Some(v3) => Ok(Rc::new(v3)),
+                                None => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                    },
+                    Value::Object(_) => match Self::deserialize(val.clone()) {
+                        Ok(v) => match v {
+                            LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_text(values: &Vec<Value>) -> Result<Vec<Rc<dyn ToText>>, CustomError> {
+        let init: Vec<Result<Rc<dyn ToText>, CustomError>> = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Number(v) => match v.is_f64() {
+                        true => match v.as_f64() {
+                            Some(v1) => match BigDecimal::from_f64(v1) {
+                                Some(v2) => Ok(Rc::new(v2)),
+                                None => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        false => match v.as_i64() {
+                            Some(v1) => Ok(Rc::new(v1 as i32)),
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                    },
+                    Value::String(v) => Ok(Rc::new(v.to_string())),
+                    Value::Bool(v) => Ok(Rc::new(v.to_string())),
+                    Value::Object(_) => match Self::deserialize(val.clone()) {
+                        Ok(v) => match v {
+                            LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::NumberComparatorExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalComparatorExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::TextComparatorExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::LogicalBinaryExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::LogicalUnaryExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::TextMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::BooleanMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                        },
+                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_boolean(values: &Vec<Value>) -> Result<Vec<Rc<dyn ToBoolean>>, CustomError> {
+        let init: Vec<Result<Rc<dyn ToBoolean>, CustomError>> = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::String(v) => match v.parse::<bool>() {
+                        Ok(v1) => Ok(Rc::new(v1)),
+                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    Value::Bool(v) => Ok(Rc::new(*v)),
+                    Value::Object(_) => match Self::deserialize(val.clone()) {
+                        Ok(v) => match v {
+                            LispExpression::NumberComparatorExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DecimalComparatorExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::TextComparatorExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::LogicalBinaryExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::LogicalUnaryExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::BooleanMatchExpression(v1) => Ok(Rc::new(v1)),
+                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize(json: Value) -> Result<LispExpression, CustomError> {
+        match json {
+            Value::Object(v) => {
+                match (v.get("op"), v.get("type"), v.get("args")) {
+                    (Some(v1), Some(v2), Some(v3)) => {
+                        match v1 {
+                            Value::String(v4) => match v4.as_str() {
+                                "+" | "*" | "-" | "/" | "%" => match v2 {
+                                    Value::String(v5) => match v5.as_str() {
+                                        "Number" => match v3 {
+                                            Value::Array(v6) => match Self::deserialize_to_number(v6) {
+                                                Ok(v7) => match v7.first() {
+                                                    Some(v8) => match v4.as_str() {
+                                                        "+" => {
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Add((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "*" => {
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Multiply((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "-" => {
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Subtract((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "/" => {
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Divide((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "%" => {
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Modulus((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                },
+                                                Err(e) => Err(e),
+                                            },
+                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                        },
+                                        "Decimal" => match v3 {
+                                            Value::Array(v6) => match Self::deserialize_to_decimal(v6) {
+                                                Ok(v7) => match v7.first() {
+                                                    Some(v8) => match v4.as_str() {
+                                                        "+" => {
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Add((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "*" => {
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Multiply((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "-" => {
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Subtract((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "/" => {
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Divide((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        "%" => {
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Modulus((v8.clone(), v7[1..].to_vec()))))
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                },
+                                                Err(e) => Err(e),
+                                            },
+                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                        },
+                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                    },
+                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                },
+                                "==" | ">=" | "<=" | ">" | "<" => {
+                                    todo!()
+                                }
+                                "and" | "or" => {
+                                    todo!()
+                                }
+                                "not" => {
+                                    todo!()
+                                }
+                                "match" => {
+                                    todo!()
+                                }
+                                // "." => {
+                                //     todo!()
+                                // }
+                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        }
+                    }
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                }
+            }
             _ => Err(CustomError::Message(Message::ErrUnexpected)),
         }
     }
@@ -2964,16 +3048,11 @@ mod lisp_tests {
     fn test_number_arithmetic_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
         let expr = DecimalArithmeticExpression::Add((
-            Box::new(2),
-            vec![Box::new(BigDecimal::from_str("2.3").unwrap()), Box::new(7)],
+            Rc::new(2),
+            vec![Rc::new(BigDecimal::from_str("2.3").unwrap()), Rc::new(7)],
         ));
         assert_eq!(11, (&expr).get_number(&symbols).unwrap());
-        println!(
-            "{}",
-            (&expr as &dyn ToDecimal)
-                .serialize(&Language::English)
-                .unwrap()
-        );
+        println!("{}", (&expr as &dyn ToDecimal).serialize().unwrap());
     }
 
     #[test]
@@ -2982,8 +3061,8 @@ mod lisp_tests {
         assert_eq!(
             BigDecimal::from_str("4.3").unwrap(),
             DecimalArithmeticExpression::Add((
-                Box::new(2),
-                vec![Box::new(BigDecimal::from_str("2.3").unwrap())]
+                Rc::new(2),
+                vec![Rc::new(BigDecimal::from_str("2.3").unwrap())]
             ))
             .get_decimal(&symbols)
             .unwrap()
@@ -2996,9 +3075,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             NumberComparatorExpression::Equals((
-                Box::new(2),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(2)]
+                Rc::new(2),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(2)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3006,9 +3085,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             NumberComparatorExpression::GreaterThanEquals((
-                Box::new(2),
-                Box::new(BigDecimal::from_str("3.3").unwrap()),
-                vec![Box::new(4)]
+                Rc::new(2),
+                Rc::new(BigDecimal::from_str("3.3").unwrap()),
+                vec![Rc::new(4)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3016,9 +3095,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             NumberComparatorExpression::LessThan((
-                Box::new(5),
-                Box::new(BigDecimal::from_str("3.3").unwrap()),
-                vec![Box::new(2)]
+                Rc::new(5),
+                Rc::new(BigDecimal::from_str("3.3").unwrap()),
+                vec![Rc::new(2)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3026,9 +3105,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             NumberComparatorExpression::GreaterThanEquals((
-                Box::new(2),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(2)]
+                Rc::new(2),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(2)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3036,9 +3115,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             NumberComparatorExpression::LessThanEquals((
-                Box::new(2),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(2)]
+                Rc::new(2),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(2)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3051,9 +3130,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             DecimalComparatorExpression::Equals((
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(BigDecimal::from_str("2.3").unwrap())]
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(BigDecimal::from_str("2.3").unwrap())]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3061,9 +3140,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             DecimalComparatorExpression::GreaterThanEquals((
-                Box::new(2),
-                Box::new(BigDecimal::from_str("3.3").unwrap()),
-                vec![Box::new(4)]
+                Rc::new(2),
+                Rc::new(BigDecimal::from_str("3.3").unwrap()),
+                vec![Rc::new(4)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3071,9 +3150,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             DecimalComparatorExpression::LessThan((
-                Box::new(5),
-                Box::new(BigDecimal::from_str("3.3").unwrap()),
-                vec![Box::new(2)]
+                Rc::new(5),
+                Rc::new(BigDecimal::from_str("3.3").unwrap()),
+                vec![Rc::new(2)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3081,9 +3160,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             DecimalComparatorExpression::GreaterThanEquals((
-                Box::new(2),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(3)]
+                Rc::new(2),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(3)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3091,9 +3170,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             DecimalComparatorExpression::LessThanEquals((
-                Box::new(4),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(1)]
+                Rc::new(4),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(1)]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3106,9 +3185,9 @@ mod lisp_tests {
         assert_eq!(
             true,
             TextComparatorExpression::Equals((
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                Box::new(BigDecimal::from_str("2.3").unwrap()),
-                vec![Box::new(BigDecimal::from_str("2.3").unwrap())]
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                Rc::new(BigDecimal::from_str("2.3").unwrap()),
+                vec![Rc::new(BigDecimal::from_str("2.3").unwrap())]
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3120,25 +3199,25 @@ mod lisp_tests {
         let symbols: HashMap<String, Symbol> = HashMap::new();
         assert_eq!(
             true,
-            LogicalBinaryExpression::And((Box::new(true), Box::new(true), vec![]))
+            LogicalBinaryExpression::And((Rc::new(true), Rc::new(true), vec![]))
                 .get_boolean(&symbols)
                 .unwrap()
         );
         assert_eq!(
             false,
-            LogicalBinaryExpression::And((Box::new(true), Box::new(false), vec![]))
+            LogicalBinaryExpression::And((Rc::new(true), Rc::new(false), vec![]))
                 .get_boolean(&symbols)
                 .unwrap()
         );
         assert_eq!(
             true,
-            LogicalBinaryExpression::Or((Box::new(true), Box::new(false), vec![]))
+            LogicalBinaryExpression::Or((Rc::new(true), Rc::new(false), vec![]))
                 .get_boolean(&symbols)
                 .unwrap()
         );
         assert_eq!(
             false,
-            LogicalBinaryExpression::Or((Box::new(false), Box::new(false), vec![]))
+            LogicalBinaryExpression::Or((Rc::new(false), Rc::new(false), vec![]))
                 .get_boolean(&symbols)
                 .unwrap()
         );
@@ -3150,7 +3229,7 @@ mod lisp_tests {
         assert_eq!(
             true,
             LogicalUnaryExpression {
-                value: Box::new(false)
+                value: Rc::new(false)
             }
             .get_boolean(&symbols)
             .unwrap()
@@ -3158,7 +3237,7 @@ mod lisp_tests {
         assert_eq!(
             false,
             LogicalUnaryExpression {
-                value: Box::new(true)
+                value: Rc::new(true)
             }
             .get_boolean(&symbols)
             .unwrap()
@@ -3170,20 +3249,20 @@ mod lisp_tests {
         let symbols: HashMap<String, Symbol> = HashMap::new();
         assert_eq!(
             7,
-            NumberMatchExpression::NumberConditionExpression((Box::new(2), vec![], Box::new(7)))
+            NumberMatchExpression::NumberConditionExpression((Rc::new(2), vec![], Rc::new(7)))
                 .get_number(&symbols)
                 .unwrap()
         );
         assert_eq!(
             11,
             NumberMatchExpression::NumberConditionExpression((
-                Box::new(2),
+                Rc::new(2),
                 vec![
-                    (Box::new(5), Box::new(8)),
-                    (Box::new(2), Box::new(11)),
-                    (Box::new(3), Box::new(13))
+                    (Rc::new(5), Rc::new(8)),
+                    (Rc::new(2), Rc::new(11)),
+                    (Rc::new(3), Rc::new(13))
                 ],
-                Box::new(7)
+                Rc::new(7)
             ))
             .get_number(&symbols)
             .unwrap()
@@ -3196,9 +3275,9 @@ mod lisp_tests {
         assert_eq!(
             BigDecimal::from_str("2.3").unwrap(),
             DecimalMatchExpression::NumberConditionExpression((
-                Box::new(2),
+                Rc::new(2),
                 vec![],
-                Box::new(BigDecimal::from_str("2.3").unwrap())
+                Rc::new(BigDecimal::from_str("2.3").unwrap())
             ))
             .get_decimal(&symbols)
             .unwrap()
@@ -3211,9 +3290,9 @@ mod lisp_tests {
         assert_eq!(
             "2.3".to_string(),
             TextMatchExpression::NumberConditionExpression((
-                Box::new(2),
+                Rc::new(2),
                 vec![],
-                Box::new(BigDecimal::from_str("2.3").unwrap())
+                Rc::new(BigDecimal::from_str("2.3").unwrap())
             ))
             .get_text(&symbols)
             .unwrap()
@@ -3226,9 +3305,9 @@ mod lisp_tests {
         assert_eq!(
             false,
             BooleanMatchExpression::NumberConditionExpression((
-                Box::new(2),
+                Rc::new(2),
                 vec![],
-                Box::new(false)
+                Rc::new(false)
             ))
             .get_boolean(&symbols)
             .unwrap()
@@ -3273,14 +3352,14 @@ mod lisp_tests {
         assert_eq!(
             11,
             DecimalArithmeticExpression::Add((
-                Box::new(DotExpression {
+                Rc::new(DotExpression {
                     path: vec![String::from("x")]
                 }),
                 vec![
-                    Box::new(DotExpression {
+                    Rc::new(DotExpression {
                         path: vec![String::from("y")]
                     }),
-                    Box::new(DotExpression {
+                    Rc::new(DotExpression {
                         path: vec![String::from("z"), String::from("z")]
                     })
                 ]
