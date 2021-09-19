@@ -741,41 +741,11 @@ impl ToBoolean for NumberComparatorExpression {
 
 #[derive(Debug, Clone)]
 enum DecimalComparatorExpression {
-    Equals(
-        (
-            Rc<dyn ToDecimal>,
-            Rc<dyn ToDecimal>,
-            Vec<Rc<dyn ToDecimal>>,
-        ),
-    ),
-    GreaterThan(
-        (
-            Rc<dyn ToDecimal>,
-            Rc<dyn ToDecimal>,
-            Vec<Rc<dyn ToDecimal>>,
-        ),
-    ),
-    LessThan(
-        (
-            Rc<dyn ToDecimal>,
-            Rc<dyn ToDecimal>,
-            Vec<Rc<dyn ToDecimal>>,
-        ),
-    ),
-    GreaterThanEquals(
-        (
-            Rc<dyn ToDecimal>,
-            Rc<dyn ToDecimal>,
-            Vec<Rc<dyn ToDecimal>>,
-        ),
-    ),
-    LessThanEquals(
-        (
-            Rc<dyn ToDecimal>,
-            Rc<dyn ToDecimal>,
-            Vec<Rc<dyn ToDecimal>>,
-        ),
-    ),
+    Equals((Rc<dyn ToDecimal>, Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    GreaterThan((Rc<dyn ToDecimal>, Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    LessThan((Rc<dyn ToDecimal>, Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    GreaterThanEquals((Rc<dyn ToDecimal>, Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
+    LessThanEquals((Rc<dyn ToDecimal>, Rc<dyn ToDecimal>, Vec<Rc<dyn ToDecimal>>)),
 }
 
 impl DecimalComparatorExpression {
@@ -1103,20 +1073,8 @@ enum LogicalBinaryOperator {
 
 #[derive(Debug, Clone)]
 enum LogicalBinaryExpression {
-    And(
-        (
-            Rc<dyn ToBoolean>,
-            Rc<dyn ToBoolean>,
-            Vec<Rc<dyn ToBoolean>>,
-        ),
-    ),
-    Or(
-        (
-            Rc<dyn ToBoolean>,
-            Rc<dyn ToBoolean>,
-            Vec<Rc<dyn ToBoolean>>,
-        ),
-    ),
+    And((Rc<dyn ToBoolean>, Rc<dyn ToBoolean>, Vec<Rc<dyn ToBoolean>>)),
+    Or((Rc<dyn ToBoolean>, Rc<dyn ToBoolean>, Vec<Rc<dyn ToBoolean>>)),
 }
 
 impl LogicalBinaryExpression {
@@ -1272,7 +1230,7 @@ impl LogicalUnaryExpression {
             Ok(v) => Ok(json!({
                 "op": "not",
                 "type": "Boolean",
-                "args": v
+                "args": json!([v])
             })),
             Err(e) => Err(e),
         }
@@ -2939,6 +2897,35 @@ impl LispExpression {
             .collect()
     }
 
+    fn deserialize_to_string(values: &Vec<Value>) -> Result<Vec<String>, CustomError> {
+        let init: Vec<Result<String, CustomError>> = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Number(v) => match v.is_f64() {
+                        true => match v.as_f64() {
+                            Some(v1) => match BigDecimal::from_f64(v1) {
+                                Some(v2) => Ok(v2.to_string()),
+                                None => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        false => match v.as_i64() {
+                            Some(v1) => Ok((v1 as i32).to_string()),
+                            None => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                    },
+                    Value::String(v) => Ok(v.to_string()),
+                    Value::Bool(v) => Ok(v.to_string()),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
     fn deserialize(json: Value) -> Result<LispExpression, CustomError> {
         match json {
             Value::Object(v) => {
@@ -3006,26 +2993,170 @@ impl LispExpression {
                                     },
                                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                 },
-                                "==" | ">=" | "<=" | ">" | "<" => {
-                                    todo!()
-                                }
-                                "and" | "or" => {
-                                    todo!()
-                                }
-                                "not" => {
-                                    todo!()
+                                "==" | ">=" | "<=" | ">" | "<" => match v2 {
+                                    Value::String(v5) => match v5.as_str() {
+                                        "Number" => match v3 {
+                                            Value::Array(v6) => match Self::deserialize_to_number(v6) {
+                                                Ok(v7) => match v7.first() {
+                                                    Some(v8) => match v7.get(1) {
+                                                        Some(v9) => match v4.as_str() {
+                                                            "==" => {
+                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::Equals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            ">=" => {
+                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::GreaterThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            "<=" => {
+                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::LessThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            ">" => {
+                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::GreaterThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            "<" => {
+                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::LessThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        None => todo!(),
+                                                    },
+                                                    None =>  Err(CustomError::Message(Message::ErrUnexpected)),
+                                                },
+                                                Err(e) => Err(e),
+                                            },
+                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                        },
+                                        "Decimal" => match v3 {
+                                            Value::Array(v6) => match Self::deserialize_to_decimal(v6) {
+                                                Ok(v7) => match v7.first() {
+                                                    Some(v8) => match v7.get(1) {
+                                                        Some(v9) => match v4.as_str() {
+                                                            "==" => {
+                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::Equals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            ">=" => {
+                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::GreaterThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            "<=" => {
+                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::LessThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            ">" => {
+                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::GreaterThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            "<" => {
+                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::LessThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        None => todo!(),
+                                                    },
+                                                    None =>  Err(CustomError::Message(Message::ErrUnexpected)),
+                                                },
+                                                Err(e) => Err(e),
+                                            },
+                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                        },
+                                        "Text" => match v3 {
+                                            Value::Array(v6) => match Self::deserialize_to_text(v6) {
+                                                Ok(v7) => match v7.first() {
+                                                    Some(v8) => match v7.get(1) {
+                                                        Some(v9) => match v4.as_str() {
+                                                            "==" => {
+                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::Equals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            ">=" => {
+                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::GreaterThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            "<=" => {
+                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::LessThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            ">" => {
+                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::GreaterThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            "<" => {
+                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::LessThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        None => todo!(),
+                                                    },
+                                                    None =>  Err(CustomError::Message(Message::ErrUnexpected)),
+                                                },
+                                                Err(e) => Err(e),
+                                            },
+                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                        },
+                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                    },
+                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                 }
                                 "match" => {
                                     todo!()
                                 }
-                                // "." => {
-                                //     todo!()
-                                // }
                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
                             },
                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
                         }
                     }
+                    (Some(v1), None, Some(v2)) => match v1 {
+                        Value::String(v3) => match v3.as_str() {
+                            "and" | "or" => match v2 {
+                                Value::Array(v4) => match Self::deserialize_to_boolean(v4) {
+                                    Ok(v5) => match v5.first() {
+                                        Some(v6) => match v5.get(1) {
+                                            Some(v7) => match v3.as_str() {
+                                                "and" => {
+                                                    Ok(LispExpression::LogicalBinaryExpression(
+                                                        LogicalBinaryExpression::And((
+                                                            v6.clone(),
+                                                            v7.clone(),
+                                                            v5[2..].to_vec(),
+                                                        )),
+                                                    ))
+                                                }
+                                                "or" => {
+                                                    Ok(LispExpression::LogicalBinaryExpression(
+                                                        LogicalBinaryExpression::Or((
+                                                            v6.clone(),
+                                                            v7.clone(),
+                                                            v5[2..].to_vec(),
+                                                        )),
+                                                    ))
+                                                }
+                                                _ => Err(CustomError::Message(
+                                                    Message::ErrUnexpected,
+                                                )),
+                                            },
+                                            None => {
+                                                Err(CustomError::Message(Message::ErrUnexpected))
+                                            }
+                                        },
+                                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                    },
+                                    Err(e) => Err(e),
+                                },
+                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            "not" => match v2 {
+                                Value::Array(v4) => match Self::deserialize_to_boolean(v4) {
+                                    Ok(v5) => match v5.first() {
+                                        Some(v6) => Ok(LispExpression::LogicalUnaryExpression(LogicalUnaryExpression { value: v6.clone() })),
+                                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                    },
+                                    Err(e) => Err(e),
+                                },
+                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            "." => match v2 {
+                                Value::Array(v4) => match Self::deserialize_to_string(v4) {
+                                    Ok(v5) => Ok(LispExpression::DotExpression(DotExpression { path: v5 })),
+                                    Err(e) => Err(e),
+                                },
+                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                            },
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
                 }
             }
@@ -3304,13 +3435,9 @@ mod lisp_tests {
         let symbols: HashMap<String, Symbol> = HashMap::new();
         assert_eq!(
             false,
-            BooleanMatchExpression::NumberConditionExpression((
-                Rc::new(2),
-                vec![],
-                Rc::new(false)
-            ))
-            .get_boolean(&symbols)
-            .unwrap()
+            BooleanMatchExpression::NumberConditionExpression((Rc::new(2), vec![], Rc::new(false)))
+                .get_boolean(&symbols)
+                .unwrap()
         );
     }
 
