@@ -2813,6 +2813,46 @@ impl LispExpression {
         }
     }
 
+    fn deserialize_to_number(val: &Value) -> Result<Rc<dyn ToValue<i32>>, CustomError> {
+        match val {
+            Value::Number(v) => match v.is_f64() {
+                true => match v.as_f64() {
+                    Some(v1) => match BigDecimal::from_f64(v1) {
+                        Some(v2) => Ok(Rc::new(v2)),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                false => match v.as_i64() {
+                    Some(v1) => Ok(Rc::new(v1 as i32)),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::String(v) => match v.parse::<i32>() {
+                Ok(v1) => Ok(Rc::new(v1)),
+                Err(_) => match v.parse::<f64>() {
+                    Ok(v2) => match BigDecimal::from_f64(v2) {
+                        Some(v3) => Ok(Rc::new(v3)),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::Object(_) => match Self::deserialize(val.clone()) {
+                Ok(v) => match v {
+                    LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
+    }
+
     fn deserialize_to_vec_number(
         values: &Vec<Value>,
     ) -> Result<Vec<Rc<dyn ToValue<i32>>>, CustomError> {
@@ -2820,47 +2860,51 @@ impl LispExpression {
         values
             .iter()
             .fold(init, |mut acc, val| {
-                acc.push(match val {
-                    Value::Number(v) => match v.is_f64() {
-                        true => match v.as_f64() {
-                            Some(v1) => match BigDecimal::from_f64(v1) {
-                                Some(v2) => Ok(Rc::new(v2)),
-                                None => Err(CustomError::Message(Message::ErrUnexpected)),
-                            },
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        false => match v.as_i64() {
-                            Some(v1) => Ok(Rc::new(v1 as i32)),
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                    },
-                    Value::String(v) => match v.parse::<i32>() {
-                        Ok(v1) => Ok(Rc::new(v1)),
-                        Err(_) => match v.parse::<f64>() {
-                            Ok(v2) => match BigDecimal::from_f64(v2) {
-                                Some(v3) => Ok(Rc::new(v3)),
-                                None => Err(CustomError::Message(Message::ErrUnexpected)),
-                            },
-                            Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                    },
-                    Value::Object(_) => match Self::deserialize(val.clone()) {
-                        Ok(v) => match v {
-                            LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
-                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                    },
-                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                });
+                acc.push(Self::deserialize_to_number(val));
                 acc
             })
             .into_iter()
             .collect()
+    }
+
+    fn deserialize_to_decimal(val: &Value) -> Result<Rc<dyn ToValue<BigDecimal>>, CustomError> {
+        match val {
+            Value::Number(v) => match v.is_f64() {
+                true => match v.as_f64() {
+                    Some(v1) => match BigDecimal::from_f64(v1) {
+                        Some(v2) => Ok(Rc::new(v2)),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                false => match v.as_i64() {
+                    Some(v1) => Ok(Rc::new(v1 as i32)),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::String(v) => match v.parse::<i32>() {
+                Ok(v1) => Ok(Rc::new(v1)),
+                Err(_) => match v.parse::<f64>() {
+                    Ok(v2) => match BigDecimal::from_f64(v2) {
+                        Some(v3) => Ok(Rc::new(v3)),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::Object(_) => match Self::deserialize(val.clone()) {
+                Ok(v) => match v {
+                    LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 
     fn deserialize_to_vec_decimal(
@@ -2870,47 +2914,49 @@ impl LispExpression {
         values
             .iter()
             .fold(init, |mut acc, val| {
-                acc.push(match val {
-                    Value::Number(v) => match v.is_f64() {
-                        true => match v.as_f64() {
-                            Some(v1) => match BigDecimal::from_f64(v1) {
-                                Some(v2) => Ok(Rc::new(v2)),
-                                None => Err(CustomError::Message(Message::ErrUnexpected)),
-                            },
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        false => match v.as_i64() {
-                            Some(v1) => Ok(Rc::new(v1 as i32)),
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                    },
-                    Value::String(v) => match v.parse::<i32>() {
-                        Ok(v1) => Ok(Rc::new(v1)),
-                        Err(_) => match v.parse::<f64>() {
-                            Ok(v2) => match BigDecimal::from_f64(v2) {
-                                Some(v3) => Ok(Rc::new(v3)),
-                                None => Err(CustomError::Message(Message::ErrUnexpected)),
-                            },
-                            Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                    },
-                    Value::Object(_) => match Self::deserialize(val.clone()) {
-                        Ok(v) => match v {
-                            LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
-                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                    },
-                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                });
+                acc.push(Self::deserialize_to_decimal(val));
                 acc
             })
             .into_iter()
             .collect()
+    }
+
+    fn deserialize_to_text(val: &Value) -> Result<Rc<dyn ToValue<String>>, CustomError> {
+        match val {
+            Value::Number(v) => match v.is_f64() {
+                true => match v.as_f64() {
+                    Some(v1) => match BigDecimal::from_f64(v1) {
+                        Some(v2) => Ok(Rc::new(v2)),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                false => match v.as_i64() {
+                    Some(v1) => Ok(Rc::new(v1 as i32)),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::String(v) => Ok(Rc::new(v.to_string())),
+            Value::Bool(v) => Ok(Rc::new(v.to_string())),
+            Value::Object(_) => match Self::deserialize(val.clone()) {
+                Ok(v) => match v {
+                    LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::NumberComparatorExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalComparatorExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::TextComparatorExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::LogicalBinaryExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::LogicalUnaryExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::TextMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::BooleanMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 
     fn deserialize_to_vec_text(
@@ -2920,45 +2966,35 @@ impl LispExpression {
         values
             .iter()
             .fold(init, |mut acc, val| {
-                acc.push(match val {
-                    Value::Number(v) => match v.is_f64() {
-                        true => match v.as_f64() {
-                            Some(v1) => match BigDecimal::from_f64(v1) {
-                                Some(v2) => Ok(Rc::new(v2)),
-                                None => Err(CustomError::Message(Message::ErrUnexpected)),
-                            },
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        false => match v.as_i64() {
-                            Some(v1) => Ok(Rc::new(v1 as i32)),
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                    },
-                    Value::String(v) => Ok(Rc::new(v.to_string())),
-                    Value::Bool(v) => Ok(Rc::new(v.to_string())),
-                    Value::Object(_) => match Self::deserialize(val.clone()) {
-                        Ok(v) => match v {
-                            LispExpression::NumberArithmeticExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalArithmeticExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::NumberComparatorExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalComparatorExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::TextComparatorExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::LogicalBinaryExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::LogicalUnaryExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::NumberMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::TextMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::BooleanMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
-                        },
-                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                    },
-                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                });
+                acc.push(Self::deserialize_to_text(val));
                 acc
             })
             .into_iter()
             .collect()
+    }
+
+    fn deserialize_to_boolean(val: &Value) -> Result<Rc<dyn ToValue<bool>>, CustomError> {
+        match val {
+            Value::String(v) => match v.parse::<bool>() {
+                Ok(v1) => Ok(Rc::new(v1)),
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            Value::Bool(v) => Ok(Rc::new(*v)),
+            Value::Object(_) => match Self::deserialize(val.clone()) {
+                Ok(v) => match v {
+                    LispExpression::NumberComparatorExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DecimalComparatorExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::TextComparatorExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::LogicalBinaryExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::LogicalUnaryExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::BooleanMatchExpression(v1) => Ok(Rc::new(v1)),
+                    LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            },
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 
     fn deserialize_to_vec_boolean(
@@ -2968,31 +3004,32 @@ impl LispExpression {
         values
             .iter()
             .fold(init, |mut acc, val| {
-                acc.push(match val {
-                    Value::String(v) => match v.parse::<bool>() {
-                        Ok(v1) => Ok(Rc::new(v1)),
-                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                    },
-                    Value::Bool(v) => Ok(Rc::new(*v)),
-                    Value::Object(_) => match Self::deserialize(val.clone()) {
-                        Ok(v) => match v {
-                            LispExpression::NumberComparatorExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DecimalComparatorExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::TextComparatorExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::LogicalBinaryExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::LogicalUnaryExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::BooleanMatchExpression(v1) => Ok(Rc::new(v1)),
-                            LispExpression::DotExpression(v1) => Ok(Rc::new(v1)),
-                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
-                    },
-                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                });
+                acc.push(Self::deserialize_to_boolean(val));
                 acc
             })
             .into_iter()
             .collect()
+    }
+
+    fn deserialize_to_string(val: &Value) -> Result<String, CustomError> {
+        match val {
+            Value::Number(v) => match v.is_f64() {
+                true => match v.as_f64() {
+                    Some(v1) => match BigDecimal::from_f64(v1) {
+                        Some(v2) => Ok(v2.to_string()),
+                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                false => match v.as_i64() {
+                    Some(v1) => Ok((v1 as i32).to_string()),
+                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+            },
+            Value::String(v) => Ok(v.to_string()),
+            Value::Bool(v) => Ok(v.to_string()),
+            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+        }
     }
 
     // Rename this to 'deserialize_to_vec_string'
@@ -3003,24 +3040,7 @@ impl LispExpression {
         values
             .iter()
             .fold(init, |mut acc, val| {
-                acc.push(match val {
-                    Value::Number(v) => match v.is_f64() {
-                        true => match v.as_f64() {
-                            Some(v1) => match BigDecimal::from_f64(v1) {
-                                Some(v2) => Ok(v2.to_string()),
-                                None => Err(CustomError::Message(Message::ErrUnexpected)),
-                            },
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                        false => match v.as_i64() {
-                            Some(v1) => Ok((v1 as i32).to_string()),
-                            None => Err(CustomError::Message(Message::ErrUnexpected)),
-                        },
-                    },
-                    Value::String(v) => Ok(v.to_string()),
-                    Value::Bool(v) => Ok(v.to_string()),
-                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
-                });
+                acc.push(Self::deserialize_to_string(val));
                 acc
             })
             .into_iter()
@@ -3037,56 +3057,58 @@ impl LispExpression {
                                 "+" | "*" | "-" | "/" | "%" => match v2 {
                                     Value::String(v5) => match v5.as_str() {
                                         "Number" => match v3 {
-                                            Value::Array(v6) => match Self::deserialize_to_vec_number(v6) {
-                                                Ok(v7) => match v7.first() {
-                                                    Some(v8) => match v4.as_str() {
+                                            Value::Array(v6) => match v6.first() {
+                                                Some(v7) => match (Self::deserialize_to_number(v7), Self::deserialize_to_vec_number(&v6[1..].to_vec())) {
+                                                    (Ok(v8), Ok(v9)) => match v4.as_str() {
                                                         "+" => {
-                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Add((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Add((v8, v9))))
                                                         },
                                                         "*" => {
-                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Multiply((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Multiply((v8, v9))))
                                                         },
                                                         "-" => {
-                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Subtract((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Subtract((v8, v9))))
                                                         },
                                                         "/" => {
-                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Divide((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Divide((v8, v9))))
                                                         },
                                                         "%" => {
-                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Modulus((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::NumberArithmeticExpression(NumberArithmeticExpression::Modulus((v8, v9))))
                                                         },
                                                         _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                     },
-                                                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    (Ok(_), Err(e)) => Err(e),
+                                                    (Err(e), Ok(_)) => Err(e),
+                                                    (Err(e), Err(_)) => Err(e),
                                                 },
-                                                Err(e) => Err(e),
+                                                None => Err(CustomError::Message(Message::ErrUnexpected)),
                                             },
                                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                         },
                                         "Decimal" => match v3 {
-                                            Value::Array(v6) => match Self::deserialize_to_vec_decimal(v6) {
-                                                Ok(v7) => match v7.first() {
-                                                    Some(v8) => match v4.as_str() {
+                                            Value::Array(v6) => match v6.first() {
+                                                Some(v7) => match (Self::deserialize_to_decimal(v7), Self::deserialize_to_vec_decimal(&v6[1..].to_vec())) {
+                                                    (Ok(v8), Ok(v9)) => match v4.as_str() {
                                                         "+" => {
-                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Add((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Add((v8, v9))))
                                                         },
                                                         "*" => {
-                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Multiply((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Multiply((v8, v9))))
                                                         },
                                                         "-" => {
-                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Subtract((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Subtract((v8, v9))))
                                                         },
                                                         "/" => {
-                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Divide((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Divide((v8, v9))))
                                                         },
                                                         "%" => {
-                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Modulus((v8.clone(), v7[1..].to_vec()))))
+                                                            Ok(LispExpression::DecimalArithmeticExpression(DecimalArithmeticExpression::Modulus((v8, v9))))
                                                         },
                                                         _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                     },
-                                                    None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
-                                                Err(e) => Err(e),
+                                                None => Err(CustomError::Message(Message::ErrUnexpected)),
                                             },
                                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                         },
@@ -3097,92 +3119,83 @@ impl LispExpression {
                                 "==" | ">=" | "<=" | ">" | "<" => match v2 {
                                     Value::String(v5) => match v5.as_str() {
                                         "Number" => match v3 {
-                                            Value::Array(v6) => match Self::deserialize_to_vec_number(v6) {
-                                                Ok(v7) => match v7.first() {
-                                                    Some(v8) => match v7.get(1) {
-                                                        Some(v9) => match v4.as_str() {
-                                                            "==" => {
-                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::Equals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            ">=" => {
-                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::GreaterThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            "<=" => {
-                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::LessThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            ">" => {
-                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::GreaterThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            "<" => {
-                                                                Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::LessThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                            Value::Array(v6) => match (v6.first(), v6.get(0)) {
+                                                (Some(v7), Some(v8)) => match (Self::deserialize_to_number(v7), Self::deserialize_to_number(v8), Self::deserialize_to_vec_number(&v6[2..].to_vec())) {
+                                                    (Ok(v9), Ok(v10), Ok(v11)) => match v4.as_str() {
+                                                        "==" => {
+                                                            Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::Equals((v9, v10, v11))))
                                                         },
-                                                        None => todo!(),
+                                                        ">=" => {
+                                                            Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::GreaterThanEquals((v9, v10, v11))))
+                                                        },
+                                                        "<=" => {
+                                                            Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::LessThanEquals((v9, v10, v11))))
+                                                        },
+                                                        ">" => {
+                                                            Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::GreaterThan((v9, v10, v11))))
+                                                        },
+                                                        "<" => {
+                                                            Ok(LispExpression::NumberComparatorExpression(NumberComparatorExpression::LessThan((v9, v10, v11))))
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                     },
-                                                    None =>  Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
-                                                Err(e) => Err(e),
+                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                             },
                                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                         },
                                         "Decimal" => match v3 {
-                                            Value::Array(v6) => match Self::deserialize_to_vec_decimal(v6) {
-                                                Ok(v7) => match v7.first() {
-                                                    Some(v8) => match v7.get(1) {
-                                                        Some(v9) => match v4.as_str() {
-                                                            "==" => {
-                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::Equals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            ">=" => {
-                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::GreaterThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            "<=" => {
-                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::LessThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            ">" => {
-                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::GreaterThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            "<" => {
-                                                                Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::LessThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                            Value::Array(v6) => match (v6.first(), v6.get(0)) {
+                                                (Some(v7), Some(v8)) => match (Self::deserialize_to_decimal(v7), Self::deserialize_to_decimal(v8), Self::deserialize_to_vec_decimal(&v6[2..].to_vec())) {
+                                                    (Ok(v9), Ok(v10), Ok(v11)) => match v4.as_str() {
+                                                        "==" => {
+                                                            Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::Equals((v9, v10, v11))))
                                                         },
-                                                        None => todo!(),
+                                                        ">=" => {
+                                                            Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::GreaterThanEquals((v9, v10, v11))))
+                                                        },
+                                                        "<=" => {
+                                                            Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::LessThanEquals((v9, v10, v11))))
+                                                        },
+                                                        ">" => {
+                                                            Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::GreaterThan((v9, v10, v11))))
+                                                        },
+                                                        "<" => {
+                                                            Ok(LispExpression::DecimalComparatorExpression(DecimalComparatorExpression::LessThan((v9, v10, v11))))
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                     },
-                                                    None =>  Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
-                                                Err(e) => Err(e),
+                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                             },
                                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                         },
                                         "Text" => match v3 {
-                                            Value::Array(v6) => match Self::deserialize_to_vec_text(v6) {
-                                                Ok(v7) => match v7.first() {
-                                                    Some(v8) => match v7.get(1) {
-                                                        Some(v9) => match v4.as_str() {
-                                                            "==" => {
-                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::Equals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            ">=" => {
-                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::GreaterThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            "<=" => {
-                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::LessThanEquals((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            ">" => {
-                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::GreaterThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            "<" => {
-                                                                Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::LessThan((v8.clone(), v9.clone(), v7[2..].to_vec()))))
-                                                            },
-                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                            Value::Array(v6) => match (v6.first(), v6.get(0)) {
+                                                (Some(v7), Some(v8)) => match (Self::deserialize_to_text(v7), Self::deserialize_to_text(v8), Self::deserialize_to_vec_text(&v6[2..].to_vec())) {
+                                                    (Ok(v9), Ok(v10), Ok(v11)) => match v4.as_str() {
+                                                        "==" => {
+                                                            Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::Equals((v9, v10, v11))))
                                                         },
-                                                        None => todo!(),
+                                                        ">=" => {
+                                                            Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::GreaterThanEquals((v9, v10, v11))))
+                                                        },
+                                                        "<=" => {
+                                                            Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::LessThanEquals((v9, v10, v11))))
+                                                        },
+                                                        ">" => {
+                                                            Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::GreaterThan((v9, v10, v11))))
+                                                        },
+                                                        "<" => {
+                                                            Ok(LispExpression::TextComparatorExpression(TextComparatorExpression::LessThan((v9, v10, v11))))
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                     },
-                                                    None =>  Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
-                                                Err(e) => Err(e),
+                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                             },
                                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                         },
@@ -3201,57 +3214,52 @@ impl LispExpression {
                     (Some(v1), None, Some(v2)) => match v1 {
                         Value::String(v3) => match v3.as_str() {
                             "and" | "or" => match v2 {
-                                Value::Array(v4) => match Self::deserialize_to_vec_boolean(v4) {
-                                    Ok(v5) => match v5.first() {
-                                        Some(v6) => match v5.get(1) {
-                                            Some(v7) => match v3.as_str() {
-                                                "and" => {
-                                                    Ok(LispExpression::LogicalBinaryExpression(
-                                                        LogicalBinaryExpression::And((
-                                                            v6.clone(),
-                                                            v7.clone(),
-                                                            v5[2..].to_vec(),
-                                                        )),
-                                                    ))
-                                                }
-                                                "or" => {
-                                                    Ok(LispExpression::LogicalBinaryExpression(
-                                                        LogicalBinaryExpression::Or((
-                                                            v6.clone(),
-                                                            v7.clone(),
-                                                            v5[2..].to_vec(),
-                                                        )),
-                                                    ))
-                                                }
-                                                _ => Err(CustomError::Message(
-                                                    Message::ErrUnexpected,
-                                                )),
-                                            },
-                                            None => {
-                                                Err(CustomError::Message(Message::ErrUnexpected))
+                                Value::Array(v4) => match (v4.first(), v4.get(1)) {
+                                    (Some(v5), Some(v6)) => match (Self::deserialize_to_boolean(v5), Self::deserialize_to_boolean(v6), Self::deserialize_to_vec_boolean(&v4[2..].to_vec())) {
+                                        (Ok(v7), Ok(v8), Ok(v9)) => match v3.as_str() {
+                                            "and" => {
+                                                Ok(LispExpression::LogicalBinaryExpression(
+                                                    LogicalBinaryExpression::And((
+                                                        v7,
+                                                        v8,
+                                                        v9,
+                                                    )),
+                                                ))
                                             }
+                                            "or" => {
+                                                Ok(LispExpression::LogicalBinaryExpression(
+                                                    LogicalBinaryExpression::Or((
+                                                        v7,
+                                                        v8,
+                                                        v9,
+                                                    )),
+                                                ))
+                                            }
+                                            _ => Err(CustomError::Message(
+                                                Message::ErrUnexpected,
+                                            )),
                                         },
-                                        None => Err(CustomError::Message(Message::ErrUnexpected)),
+                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                     },
-                                    Err(e) => Err(e),
+                                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                 },
                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
                             },
                             "not" => match v2 {
-                                Value::Array(v4) => match Self::deserialize_to_vec_boolean(v4) {
-                                    Ok(v5) => match v5.first() {
-                                        Some(v6) => Ok(LispExpression::LogicalUnaryExpression(LogicalUnaryExpression { value: v6.clone() })),
-                                        None => Err(CustomError::Message(Message::ErrUnexpected)),
-                                    },
-                                    Err(e) => Err(e),
-                                },
+                                Value::Array(v4) => match v4.first() {
+                                    Some(v5) => match Self::deserialize_to_boolean(v5) {
+                                        Ok(v6) => Ok(LispExpression::LogicalUnaryExpression(LogicalUnaryExpression { value: v6 })),
+                                        Err(e) => Err(e),
+                                     }
+                                    None => todo!(),
+                                }
                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
                             },
                             "." => match v2 {
                                 Value::Array(v4) => match Self::deserialize_to_vec_string(v4) {
                                     Ok(v5) => Ok(LispExpression::DotExpression(DotExpression { path: v5 })),
                                     Err(e) => Err(e),
-                                },
+                                }
                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
                             },
                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
