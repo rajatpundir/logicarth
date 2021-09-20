@@ -3008,7 +3008,7 @@ impl LispExpression {
     fn deserialize_to_number_match_number(
         values: &Vec<Value>,
     ) -> Result<Vec<(Box<dyn ToValue<i32>>, Box<dyn ToValue<i32>>)>, CustomError> {
-        let init: Vec<Result<(Box<dyn ToValue<i32>>, Box<dyn ToValue<i32>>), CustomError>> = vec![];
+        let init = vec![];
         values
             .iter()
             .fold(init, |mut acc, val| {
@@ -3017,6 +3017,402 @@ impl LispExpression {
                         (Some(v1), Some(v2)) => match (
                             Self::deserialize_to_number(v1),
                             Self::deserialize_to_number(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_number_match_decimal(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<BigDecimal>>, Box<dyn ToValue<i32>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_decimal(v1),
+                            Self::deserialize_to_number(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_number_match_text(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<String>>, Box<dyn ToValue<i32>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_text(v1),
+                            Self::deserialize_to_number(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_number_match_boolean(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<bool>>, Box<dyn ToValue<i32>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_boolean(v1),
+                            Self::deserialize_to_number(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    // DECIMAL
+
+    fn deserialize_to_decimal_match_number(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<i32>>, Box<dyn ToValue<BigDecimal>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_number(v1),
+                            Self::deserialize_to_decimal(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_decimal_match_decimal(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<BigDecimal>>, Box<dyn ToValue<BigDecimal>>)>, CustomError>
+    {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_decimal(v1),
+                            Self::deserialize_to_decimal(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_decimal_match_text(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<String>>, Box<dyn ToValue<BigDecimal>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_text(v1),
+                            Self::deserialize_to_decimal(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_decimal_match_boolean(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<bool>>, Box<dyn ToValue<BigDecimal>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_boolean(v1),
+                            Self::deserialize_to_decimal(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    // TEXT
+
+    fn deserialize_to_text_match_number(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<i32>>, Box<dyn ToValue<String>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_number(v1),
+                            Self::deserialize_to_text(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_text_match_decimal(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<BigDecimal>>, Box<dyn ToValue<String>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_decimal(v1),
+                            Self::deserialize_to_text(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_text_match_text(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<String>>, Box<dyn ToValue<String>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => {
+                            match (Self::deserialize_to_text(v1), Self::deserialize_to_text(v2)) {
+                                (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                            }
+                        }
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_text_match_boolean(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<bool>>, Box<dyn ToValue<String>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_boolean(v1),
+                            Self::deserialize_to_text(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    // BOOLEAN
+
+    fn deserialize_to_boolean_match_number(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<i32>>, Box<dyn ToValue<bool>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_number(v1),
+                            Self::deserialize_to_boolean(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_boolean_match_decimal(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<BigDecimal>>, Box<dyn ToValue<bool>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_decimal(v1),
+                            Self::deserialize_to_boolean(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_boolean_match_text(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<String>>, Box<dyn ToValue<bool>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_text(v1),
+                            Self::deserialize_to_boolean(v2),
+                        ) {
+                            (Ok(v3), Ok(v4)) => Ok((v3, v4)),
+                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                        },
+                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                    },
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                });
+                acc
+            })
+            .into_iter()
+            .collect()
+    }
+
+    fn deserialize_to_boolean_match_boolean(
+        values: &Vec<Value>,
+    ) -> Result<Vec<(Box<dyn ToValue<bool>>, Box<dyn ToValue<bool>>)>, CustomError> {
+        let init = vec![];
+        values
+            .iter()
+            .fold(init, |mut acc, val| {
+                acc.push(match val {
+                    Value::Array(v) => match (v.first(), v.get(1)) {
+                        (Some(v1), Some(v2)) => match (
+                            Self::deserialize_to_boolean(v1),
+                            Self::deserialize_to_boolean(v2),
                         ) {
                             (Ok(v3), Ok(v4)) => Ok((v3, v4)),
                             _ => Err(CustomError::Message(Message::ErrUnexpected)),
@@ -3219,8 +3615,9 @@ impl LispExpression {
                                                     "Number" => match v3 {
                                                         Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
                                                             (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_number(v10), v11, Self::deserialize_to_number(v12)) {
-                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => {
-                                                                    todo!()
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_number_match_number(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::NumberMatchExpression(NumberMatchExpression::NumberConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
                                                                 },
                                                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                             },
@@ -3228,30 +3625,210 @@ impl LispExpression {
                                                         },
                                                         _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                     },
-                                                    "Decimal" => todo!(),
-                                                    "Text" => todo!(),
-                                                    "Boolean" => todo!(),
+                                                    "Decimal" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_decimal(v10), v11, Self::deserialize_to_number(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_number_match_decimal(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::NumberMatchExpression(NumberMatchExpression::DecimalConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Text" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_text(v10), v11, Self::deserialize_to_number(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_number_match_text(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::NumberMatchExpression(NumberMatchExpression::TextConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Boolean" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_boolean(v10), v11, Self::deserialize_to_number(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_number_match_boolean(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::NumberMatchExpression(NumberMatchExpression::BooleanConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
                                                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
                                                 "Decimal" => match v9.as_str() {
-                                                    "Number" => todo!(),
-                                                    "Decimal" => todo!(),
-                                                    "Text" => todo!(),
-                                                    "Boolean" => todo!(),
+                                                    "Number" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_number(v10), v11, Self::deserialize_to_decimal(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_decimal_match_number(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::DecimalMatchExpression(DecimalMatchExpression::NumberConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Decimal" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_decimal(v10), v11, Self::deserialize_to_decimal(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_decimal_match_decimal(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::DecimalMatchExpression(DecimalMatchExpression::DecimalConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Text" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_text(v10), v11, Self::deserialize_to_decimal(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_decimal_match_text(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::DecimalMatchExpression(DecimalMatchExpression::TextConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Boolean" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_boolean(v10), v11, Self::deserialize_to_decimal(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_decimal_match_boolean(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::DecimalMatchExpression(DecimalMatchExpression::BooleanConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
                                                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
                                                 "Text" => match v9.as_str() {
-                                                    "Number" => todo!(),
-                                                    "Decimal" => todo!(),
-                                                    "Text" => todo!(),
-                                                    "Boolean" => todo!(),
+                                                    "Number" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_number(v10), v11, Self::deserialize_to_text(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_text_match_number(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::TextMatchExpression(TextMatchExpression::NumberConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Decimal" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_decimal(v10), v11, Self::deserialize_to_text(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_text_match_decimal(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::TextMatchExpression(TextMatchExpression::DecimalConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Text" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_text(v10), v11, Self::deserialize_to_text(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_text_match_text(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::TextMatchExpression(TextMatchExpression::TextConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Boolean" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_boolean(v10), v11, Self::deserialize_to_text(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_text_match_boolean(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::TextMatchExpression(TextMatchExpression::BooleanConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
                                                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
                                                 "Boolean" => match v9.as_str() {
-                                                    "Number" => todo!(),
-                                                    "Decimal" => todo!(),
-                                                    "Text" => todo!(),
-                                                    "Boolean" => todo!(),
+                                                    "Number" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_number(v10), v11, Self::deserialize_to_boolean(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_boolean_match_number(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::BooleanMatchExpression(BooleanMatchExpression::NumberConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Decimal" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_decimal(v10), v11, Self::deserialize_to_boolean(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_boolean_match_decimal(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::BooleanMatchExpression(BooleanMatchExpression::DecimalConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Text" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_text(v10), v11, Self::deserialize_to_boolean(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_boolean_match_text(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::BooleanMatchExpression(BooleanMatchExpression::TextConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
+                                                    "Boolean" => match v3 {
+                                                        Value::Array(v10) => match (v10.first(), v10.get(1), v10.get(2)) {
+                                                            (Some(v10), Some(v11), Some(v12)) => match (Self::deserialize_to_boolean(v10), v11, Self::deserialize_to_boolean(v12)) {
+                                                                (Ok(v13), Value::Array(v14), Ok(v15)) => match Self::deserialize_to_boolean_match_boolean(v14) {
+                                                                    Ok(v16) => Ok(LispExpression::BooleanMatchExpression(BooleanMatchExpression::BooleanConditionExpression((v13, v16, v15)))),
+                                                                    Err(e) => Err(e),
+                                                                },
+                                                                _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                            },
+                                                            _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                        },
+                                                        _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                                                    },
                                                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
                                                 },
                                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
@@ -3299,7 +3876,7 @@ impl LispExpression {
                                         Ok(v6) => Ok(LispExpression::LogicalUnaryExpression(LogicalUnaryExpression { value: v6 })),
                                         Err(e) => Err(e),
                                      }
-                                    None => todo!(),
+                                    None => Err(CustomError::Message(Message::ErrUnexpected)),
                                 }
                                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
                             },
