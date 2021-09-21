@@ -4,11 +4,14 @@
  * Written by Rajat Pundir <rajatpundir13@gmail.com>, August 2021
  */
 
-// Notes.
-// 1. Test serializers and deserializers
-// 2. Add Diesel
-// 3. Modularize code
-// 4. Build some audio visual documentation
+// Notes for the future.
+// 1. Build some docs and audio visual documentation for quick understanding
+// 2. transmute() can be used to cast Box<ToValue<i32>> to Box<ToValue<V>> in deserializing match expressions
+// 3. Match expression can be generalized further with generics, MatchExp<T, U> (T, [(T, U), U])
+
+// TODO
+// 1. Add Diesel
+// 2. Modularize code
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
@@ -93,7 +96,7 @@ struct Symbol {
 
 // Traits
 
-trait ToValue<T: Sized> {
+trait ToValue<T> {
     fn get_value(&self, symbols: &HashMap<String, Symbol>) -> Result<T, CustomError>;
     fn serialize(&self) -> Result<Value, CustomError>;
 }
