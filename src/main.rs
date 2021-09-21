@@ -5,10 +5,10 @@
  */
 
 // Notes.
-// 1. Test serializers, implement deserializers
-// 2. Modularize code
-// 3. Build some audio visual documentation
-// 4. Add Diesel
+// 1. Test serializers and deserializers
+// 2. Add Diesel
+// 3. Modularize code
+// 4. Build some audio visual documentation
 
 use bigdecimal::{BigDecimal, FromPrimitive, ToPrimitive};
 use core::fmt::Debug;
@@ -1224,7 +1224,6 @@ impl LogicalBinaryExpression {
                             .collect();
                         Ok(json!({
                             "op": operator,
-                            "type": "Boolean",
                             "args": args
                         }))
                     }
@@ -1289,7 +1288,6 @@ impl LogicalUnaryExpression {
         match self.value.serialize() {
             Ok(v) => Ok(json!({
                 "op": "not",
-                "type": "Boolean",
                 "args": json!([v])
             })),
             Err(e) => Err(e),
@@ -1615,7 +1613,7 @@ impl ToValue<i32> for NumberMatchExpression {
     }
 
     fn serialize(&self) -> Result<Value, CustomError> {
-        (self as &dyn ToValue<i32>).serialize()
+        self.serialize()
     }
 }
 
@@ -1628,7 +1626,7 @@ impl ToValue<BigDecimal> for NumberMatchExpression {
     }
 
     fn serialize(&self) -> Result<Value, CustomError> {
-        (self as &dyn ToValue<i32>).serialize()
+        self.serialize()
     }
 }
 
@@ -1641,7 +1639,7 @@ impl ToValue<String> for NumberMatchExpression {
     }
 
     fn serialize(&self) -> Result<Value, CustomError> {
-        (self as &dyn ToValue<i32>).serialize()
+        self.serialize()
     }
 }
 
@@ -2539,7 +2537,7 @@ impl ToValue<bool> for BooleanMatchExpression {
     }
 
     fn serialize(&self) -> Result<Value, CustomError> {
-        (self as &dyn ToValue<String>).serialize()
+        self.serialize()
     }
 }
 
@@ -2552,7 +2550,7 @@ impl ToValue<String> for BooleanMatchExpression {
     }
 
     fn serialize(&self) -> Result<Value, CustomError> {
-        (self as &dyn ToValue<String>).serialize()
+        self.serialize()
     }
 }
 
@@ -3005,6 +3003,8 @@ impl LispExpression {
             .collect()
     }
 
+    // NUMBER MATCH
+
     fn deserialize_to_number_match_number(
         values: &Vec<Value>,
     ) -> Result<Vec<(Box<dyn ToValue<i32>>, Box<dyn ToValue<i32>>)>, CustomError> {
@@ -3109,7 +3109,7 @@ impl LispExpression {
             .collect()
     }
 
-    // DECIMAL
+    // DECIMAL MATCH
 
     fn deserialize_to_decimal_match_number(
         values: &Vec<Value>,
@@ -3216,7 +3216,7 @@ impl LispExpression {
             .collect()
     }
 
-    // TEXT
+    // TEXT MATCH
 
     fn deserialize_to_text_match_number(
         values: &Vec<Value>,
@@ -3321,7 +3321,7 @@ impl LispExpression {
             .collect()
     }
 
-    // BOOLEAN
+    // BOOLEAN MATCH
 
     fn deserialize_to_boolean_match_number(
         values: &Vec<Value>,
@@ -3426,32 +3426,6 @@ impl LispExpression {
             .into_iter()
             .collect()
     }
-
-    // fn deserialize_x<T>(
-    //     values: &Vec<Value>,
-    // ) -> Result<Vec<(Box<dyn ToValue<T>>, Box<dyn ToValue<T>>)>, CustomError> {
-    //     let init = vec![];
-    //     values
-    //         .iter()
-    //         .fold(init, |mut acc, val| {
-    //             acc.push(match val {
-    //                 Value::Array(v) => match (v.first(), v.get(1)) {
-    //                     (Some(v1), Some(v2)) => match (
-    //                         Self::deserialize_to_number(v1),
-    //                         Self::deserialize_to_number(v2),
-    //                     ) {
-    //                         (Ok(v3), Ok(v4)) => Ok((v3, v4)),
-    //                         _ => Err(CustomError::Message(Message::ErrUnexpected)),
-    //                     },
-    //                     _ => Err(CustomError::Message(Message::ErrUnexpected)),
-    //                 },
-    //                 _ => Err(CustomError::Message(Message::ErrUnexpected)),
-    //             });
-    //             acc
-    //         })
-    //         .into_iter()
-    //         .collect()
-    // }
 
     fn deserialize(json: Value) -> Result<LispExpression, CustomError> {
         match json {
@@ -3912,43 +3886,118 @@ mod lisp_tests {
     #[test]
     fn test_number_arithmetic_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let expr = DecimalArithmeticExpression::Add((
+        let expr = NumberArithmeticExpression::Add((
             Box::new(2),
             vec![Box::new(BigDecimal::from_str("2.3").unwrap()), Box::new(7)],
         ));
         let res: i32 = (&expr).get_value(&symbols).unwrap();
         assert_eq!(11, res);
-        println!(
-            "{}",
-            (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap()
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize((&expr as &dyn ToValue<i32>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::NumberArithmeticExpression(v) =>
+                        (&v as &dyn ToValue<i32>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<i32>).serialize().unwrap(),
+            match LispExpression::deserialize(
+                (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::NumberArithmeticExpression(v) =>
+                        (&v as &dyn ToValue<i32>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
         );
     }
 
     #[test]
     fn test_decimal_arithmetic_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
+        let expr = DecimalArithmeticExpression::Add((
+            Box::new(2),
+            vec![Box::new(BigDecimal::from_str("2.3").unwrap())],
+        ));
+        let res: BigDecimal = (&expr).get_value(&symbols).unwrap();
+        assert_eq!(BigDecimal::from_str("4.3").unwrap(), res);
+        // eval == serialize.deserialize.eval
         assert_eq!(
-            BigDecimal::from_str("4.3").unwrap(),
-            DecimalArithmeticExpression::Add((
-                Box::new(2),
-                vec![Box::new(BigDecimal::from_str("2.3").unwrap())]
-            ))
-            .get_value(&symbols)
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::DecimalArithmeticExpression(v) =>
+                        (&v as &dyn ToValue<BigDecimal>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
             .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap(),
+            match LispExpression::deserialize(
+                (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::DecimalArithmeticExpression(v) =>
+                        (&v as &dyn ToValue<BigDecimal>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
         );
     }
 
     #[test]
     fn test_number_comparator_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: bool = NumberComparatorExpression::Equals((
+        let expr = NumberComparatorExpression::Equals((
             Box::new(2),
             Box::new(BigDecimal::from_str("2.3").unwrap()),
             vec![Box::new(2)],
-        ))
-        .get_value(&symbols)
-        .unwrap();
+        ));
+        let res: bool = (&expr).get_value(&symbols).unwrap();
         assert_eq!(true, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<bool>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::NumberComparatorExpression(v) =>
+                        (&v as &dyn ToValue<bool>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<bool>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<bool>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::NumberComparatorExpression(v) =>
+                        (&v as &dyn ToValue<bool>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
         let res: bool = NumberComparatorExpression::GreaterThanEquals((
             Box::new(2),
             Box::new(BigDecimal::from_str("3.3").unwrap()),
@@ -3986,14 +4035,40 @@ mod lisp_tests {
     #[test]
     fn test_decimal_comparator_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: bool = DecimalComparatorExpression::Equals((
+        let expr = DecimalComparatorExpression::Equals((
             Box::new(BigDecimal::from_str("2.3").unwrap()),
             Box::new(BigDecimal::from_str("2.3").unwrap()),
             vec![Box::new(BigDecimal::from_str("2.3").unwrap())],
-        ))
-        .get_value(&symbols)
-        .unwrap();
+        ));
+        let res: bool = (&expr).get_value(&symbols).unwrap();
         assert_eq!(true, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<bool>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::DecimalComparatorExpression(v) =>
+                        (&v as &dyn ToValue<bool>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<bool>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<bool>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::DecimalComparatorExpression(v) =>
+                        (&v as &dyn ToValue<bool>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
         let res: bool = DecimalComparatorExpression::GreaterThanEquals((
             Box::new(2),
             Box::new(BigDecimal::from_str("3.3").unwrap()),
@@ -4044,10 +4119,36 @@ mod lisp_tests {
     #[test]
     fn test_logical_binary_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: bool = LogicalBinaryExpression::And((Box::new(true), Box::new(true), vec![]))
-            .get_value(&symbols)
-            .unwrap();
+        let expr = LogicalBinaryExpression::And((Box::new(true), Box::new(true), vec![]));
+        let res: bool = (&expr).get_value(&symbols).unwrap();
         assert_eq!(true, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<bool>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::LogicalBinaryExpression(v) =>
+                        (&v as &dyn ToValue<bool>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<bool>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<bool>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::LogicalBinaryExpression(v) =>
+                        (&v as &dyn ToValue<bool>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
         let res: bool = LogicalBinaryExpression::And((Box::new(true), Box::new(false), vec![]))
             .get_value(&symbols)
             .unwrap();
@@ -4065,12 +4166,38 @@ mod lisp_tests {
     #[test]
     fn test_logical_unary_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: bool = LogicalUnaryExpression {
+        let expr = LogicalUnaryExpression {
             value: Box::new(false),
-        }
-        .get_value(&symbols)
-        .unwrap();
+        };
+        let res: bool = (&expr).get_value(&symbols).unwrap();
         assert_eq!(true, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<bool>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::LogicalUnaryExpression(v) =>
+                        (&v as &dyn ToValue<bool>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<bool>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<bool>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::LogicalUnaryExpression(v) =>
+                        (&v as &dyn ToValue<bool>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
         let res: bool = LogicalUnaryExpression {
             value: Box::new(true),
         }
@@ -4082,11 +4209,35 @@ mod lisp_tests {
     #[test]
     fn test_number_match_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: i32 =
-            NumberMatchExpression::NumberConditionExpression((Box::new(2), vec![], Box::new(7)))
-                .get_value(&symbols)
-                .unwrap();
+        let expr =
+            NumberMatchExpression::NumberConditionExpression((Box::new(2), vec![], Box::new(7)));
+        let res: i32 = (&expr).get_value(&symbols).unwrap();
         assert_eq!(7, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize((&expr as &dyn ToValue<i32>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::NumberMatchExpression(v) =>
+                        (&v as &dyn ToValue<i32>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<i32>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<i32>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::NumberMatchExpression(v) =>
+                        (&v as &dyn ToValue<i32>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
         let res: i32 = NumberMatchExpression::NumberConditionExpression((
             Box::new(2),
             vec![
@@ -4104,40 +4255,121 @@ mod lisp_tests {
     #[test]
     fn test_decimal_match_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: BigDecimal = DecimalMatchExpression::NumberConditionExpression((
+        let expr = DecimalMatchExpression::NumberConditionExpression((
             Box::new(2),
             vec![],
             Box::new(BigDecimal::from_str("2.3").unwrap()),
-        ))
-        .get_value(&symbols)
-        .unwrap();
+        ));
+        let res: BigDecimal = (&expr).get_value(&symbols).unwrap();
         assert_eq!(BigDecimal::from_str("2.3").unwrap(), res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::DecimalMatchExpression(v) =>
+                        (&v as &dyn ToValue<BigDecimal>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap(),
+            match LispExpression::deserialize(
+                (&expr as &dyn ToValue<BigDecimal>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::DecimalMatchExpression(v) =>
+                        (&v as &dyn ToValue<BigDecimal>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
     }
 
     #[test]
     fn test_text_match_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: String = TextMatchExpression::NumberConditionExpression((
+        let expr = TextMatchExpression::NumberConditionExpression((
             Box::new(2),
             vec![],
             Box::new(BigDecimal::from_str("2.3").unwrap()),
-        ))
-        .get_value(&symbols)
-        .unwrap();
+        ));
+        let res: String = (&expr).get_value(&symbols).unwrap();
         assert_eq!("2.3".to_string(), res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<String>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::TextMatchExpression(v) =>
+                        (&v as &dyn ToValue<String>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<String>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<String>).serialize().unwrap())
+            {
+                Ok(v) => match v {
+                    LispExpression::TextMatchExpression(v) =>
+                        (&v as &dyn ToValue<String>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
     }
 
     #[test]
     fn test_boolean_match_expression() {
         let symbols: HashMap<String, Symbol> = HashMap::new();
-        let res: bool = BooleanMatchExpression::NumberConditionExpression((
+        let expr = BooleanMatchExpression::NumberConditionExpression((
             Box::new(2),
             vec![],
             Box::new(false),
-        ))
-        .get_value(&symbols)
-        .unwrap();
+        ));
+        let res: bool = (&expr).get_value(&symbols).unwrap();
         assert_eq!(false, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize(
+                (&expr as &dyn ToValue<bool>).serialize().unwrap()
+            ) {
+                Ok(v) => match v {
+                    LispExpression::BooleanMatchExpression(v) =>
+                        (&v as &dyn ToValue<bool>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<bool>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<bool>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::BooleanMatchExpression(v) =>
+                        (&v as &dyn ToValue<bool>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
     }
 
     #[test]
@@ -4175,7 +4407,7 @@ mod lisp_tests {
         ]
         .into_iter()
         .collect();
-        let res: i32 = DecimalArithmeticExpression::Add((
+        let expr = DecimalArithmeticExpression::Add((
             Box::new(DotExpression {
                 path: vec![String::from("x")],
             }),
@@ -4187,9 +4419,33 @@ mod lisp_tests {
                     path: vec![String::from("z"), String::from("z")],
                 }),
             ],
-        ))
-        .get_value(&symbols)
-        .unwrap();
+        ));
+        let res: i32 = (&expr).get_value(&symbols).unwrap();
         assert_eq!(11, res);
+        // eval == serialize.deserialize.eval
+        assert_eq!(
+            res,
+            (match LispExpression::deserialize((&expr as &dyn ToValue<i32>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::DecimalArithmeticExpression(v) =>
+                        (&v as &dyn ToValue<i32>).get_value(&symbols),
+                    _ => Err(CustomError::Message(Message::ErrUnexpected)),
+                },
+                Err(_) => Err(CustomError::Message(Message::ErrUnexpected)),
+            })
+            .unwrap()
+        );
+        // serialize == serialize.deserialize.serialize
+        assert_eq!(
+            (&expr as &dyn ToValue<i32>).serialize().unwrap(),
+            match LispExpression::deserialize((&expr as &dyn ToValue<i32>).serialize().unwrap()) {
+                Ok(v) => match v {
+                    LispExpression::DecimalArithmeticExpression(v) =>
+                        (&v as &dyn ToValue<i32>).serialize().unwrap(),
+                    _ => Value::Null,
+                },
+                Err(_) => Value::Null,
+            }
+        );
     }
 }
